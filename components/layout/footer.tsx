@@ -30,7 +30,7 @@ export function Footer({ variant = "default" }: FooterProps) {
           )}
         </div>
         <div className="mt-8 pt-8 border-t text-center text-gray-500 text-sm">
-          <p>© 2024 CarePilot. All rights reserved.</p>
+          <p>© 2025 CarePilot. All rights reserved.</p>
         </div>
       </div>
     </footer>

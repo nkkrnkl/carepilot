@@ -791,7 +791,7 @@ export default function SettingsPage() {
                     <h3 className="font-semibold text-gray-900 mb-2">About</h3>
                     <div className="space-y-2 text-sm text-gray-600">
                       <p>CarePilot v1.0.0</p>
-                      <p>© 2024 CarePilot. All rights reserved.</p>
+                      <p>© 2025 CarePilot. All rights reserved.</p>
                     </div>
                   </div>
                 </CardContent>

@@ -89,7 +89,7 @@ export function HeroSection({
             {title.primary}
           </div>
           <div 
-            className={`block ${title.secondaryColor || "text-blue-600"} mt-2`}
+            className={`block ${title.secondaryColor || "text-blue-600"} mt-2 text-3xl lg:text-4xl`}
             style={{
               animation: 'slideInUp 0.8s ease-out 0.4s both',
             }}
@@ -98,7 +98,7 @@ export function HeroSection({
           </div>
         </h1>
         <p 
-          className={`text-xl lg:text-2xl text-gray-600 mb-8 max-w-3xl mx-auto leading-relaxed transition-all duration-1000 delay-400 ${
+          className={`text-xl lg:text-2xl text-gray-600 mb-8 max-w-3xl mx-auto leading-relaxed transition-all duration-1000 delay-400 italic ${
             isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
           }`}
         >

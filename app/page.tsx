@@ -52,10 +52,10 @@ export default function LandingPage() {
         }}
         title={{
           primary: "CarePilot",
-          secondary: "Your Healthcare Navigation System",
+          secondary: "Your Personal Health Co-Pilot",
           secondaryColor: "text-blue-600",
         }}
-        description="CarePilot is an AI agent that handles four high-leverage tasks to streamline your healthcare experience. From analyzing lab results to managing appointments, negotiating bills, and processing claims—we automate the complex so you can focus on what matters."
+        description="Simplifies healthcare by handling what matters most—analyzing labs, booking appointments, negotiating bills, and managing claims—so you can focus on your health, not the paperwork."
         cta={{
           primary: {
             text: "Explore Features",
