@@ -33,12 +33,24 @@ if [ -z "$CONNECTION_STRING" ]; then
     exit 1
 fi
 
+# Get storage account key for table storage
+echo "🔑 Retrieving storage account key..."
+ACCOUNT_KEY=$(az storage account keys list \
+  --name "$STORAGE_ACCOUNT_NAME" \
+  --subscription "$SUBSCRIPTION_ID" \
+  --query "[0].value" \
+  --output tsv 2>/dev/null)
+
 # Create .env file
 cat > .env << EOF
 # Azure Blob Storage Configuration
 # Generated on $(date)
 AZURE_STORAGE_CONNECTION_STRING="$CONNECTION_STRING"
 AZURE_BLOB_CONTAINER_NAME="doctor-data"
+
+# Azure Table Storage Configuration
+AZURE_STORAGE_ACCOUNT_NAME="$STORAGE_ACCOUNT_NAME"
+AZURE_STORAGE_ACCOUNT_KEY="$ACCOUNT_KEY"
 EOF
 
 echo "✅ .env file created successfully!"
