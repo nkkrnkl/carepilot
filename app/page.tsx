@@ -11,10 +11,59 @@ import { CTASection } from "@/components/sections/cta-section";
 import { FEATURES, ROUTES } from "@/lib/constants";
 import { Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useUser } from '@auth0/nextjs-auth0/client';
+import { useRouter } from "next/navigation";
 
 export default function LandingPage() {
+  const router = useRouter();
+  const { user, isLoading } = useUser();
   const [scrollY, setScrollY] = useState(0);
   const featuresRef = useRef<HTMLDivElement>(null);
+  const [checkingRole, setCheckingRole] = useState(false);
+
+  // Check if user is logged in and redirect to appropriate dashboard
+  useEffect(() => {
+    async function checkUserAndRedirect() {
+      // Don't redirect while Auth0 is loading
+      if (isLoading) return;
+      
+      // Only redirect if user is logged in
+      if (user && user.email && !checkingRole) {
+        setCheckingRole(true);
+        try {
+          // Check if user has a role set in database
+          const response = await fetch(`/api/users/role`);
+          const data = await response.json();
+          
+          if (data.success && data.role) {
+            // User has a role, redirect to appropriate dashboard immediately
+            window.location.href = data.role === "doctor" ? "/doctorportal" : "/patient";
+            return;
+          }
+          
+          // Check if user exists in database with role
+          const userResponse = await fetch(`/api/users?emailAddress=${encodeURIComponent(user.email)}`);
+          const userData = await userResponse.json();
+          
+          if (userData.success && userData.user?.userRole) {
+            // User has a role, redirect to appropriate dashboard immediately
+            window.location.href = userData.user.userRole === "doctor" ? "/doctorportal" : "/patient";
+            return;
+          }
+          
+          // User is logged in but has no role - redirect to sign-in page to select role
+          // This will show the role selection UI
+          window.location.href = "/signin";
+        } catch (error) {
+          console.error("Error checking user role:", error);
+          // On error, redirect to sign-in page
+          window.location.href = "/signin";
+        }
+      }
+    }
+    
+    checkUserAndRedirect();
+  }, [user, isLoading, checkingRole]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -24,6 +73,18 @@ export default function LandingPage() {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // Show loading state while checking authentication
+  if (isLoading || (user && checkingRole)) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 via-white to-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 via-white to-gray-50 relative overflow-hidden">

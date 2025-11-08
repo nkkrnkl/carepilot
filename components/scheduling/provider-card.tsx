@@ -151,16 +151,21 @@ export function ProviderCard({ provider, onSelectSlot, selectedSlotId }: Provide
               {provider.slots.slice(0, 4).map((slot) => (
                 <Button
                   key={slot.id}
-                  variant={selectedSlotId === slot.id ? "default" : "outline"}
+                  variant={selectedSlotId === slot.id ? "default" : slot.available ? "outline" : "secondary"}
                   size="sm"
-                  onClick={() => onSelectSlot(provider.id, slot.id)}
+                  onClick={() => slot.available && onSelectSlot(provider.id, slot.id)}
                   disabled={!slot.available}
-                  className="flex flex-col items-center justify-center h-auto py-2"
+                  className={`flex flex-col items-center justify-center h-auto py-2 ${
+                    !slot.available ? 'opacity-50 cursor-not-allowed bg-gray-100 text-gray-400' : ''
+                  }`}
                 >
                   <span className="text-xs font-medium">{slot.date}</span>
                   <span className="text-xs">{slot.time}</span>
                   {slot.mode === "telehealth" && (
                     <Video className="h-3 w-3 mt-1" />
+                  )}
+                  {!slot.available && (
+                    <span className="text-xs mt-1 text-gray-500">Booked</span>
                   )}
                 </Button>
               ))}

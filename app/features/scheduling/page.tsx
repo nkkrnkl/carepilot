@@ -112,39 +112,124 @@ export default function SchedulingPage() {
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
 
-  // Fetch providers from API
+  // Function to mark slots as unavailable based on existing appointments
+  const markBookedSlots = (providersData: Provider[], appointments: any[]) => {
+    return providersData.map(provider => {
+      // Find appointments for this provider
+      const providerAppointments = appointments.filter(apt => apt.doctorId === provider.id && apt.status === 'scheduled');
+      
+      // Mark slots as unavailable if they match an existing appointment
+      const updatedSlots = provider.slots.map(slot => {
+        // Check if this slot matches any appointment
+        const isBooked = providerAppointments.some(apt => {
+          // Parse appointment date/time
+          const aptDate = new Date(apt.appointmentDate);
+          const aptTime = apt.appointmentTime || aptDate.toLocaleTimeString('en-US', { 
+            hour: 'numeric', 
+            minute: '2-digit',
+            hour12: true 
+          });
+          
+          // Normalize times for comparison (handle variations like "9:30 AM" vs "9:30AM")
+          const normalizeTime = (time: string) => {
+            return time.trim().replace(/\s+/g, ' ').toUpperCase();
+          };
+          
+          const slotTimeMatch = normalizeTime(slot.time) === normalizeTime(aptTime);
+          const slotTypeMatch = (slot.mode === 'telehealth' && apt.appointmentType === 'telehealth') ||
+                                (slot.mode === 'in-person' && apt.appointmentType === 'in-person');
+          
+          // Try to match dates - parse slot date if possible
+          // Slot format: "Tue, Nov 12" or similar
+          // Appointment date: ISO string
+          let dateMatch = false;
+          try {
+            // Extract day and month from slot date (e.g., "Nov 12" from "Tue, Nov 12")
+            const slotDateParts = slot.date.match(/(\w+)\s+(\d+)/);
+            if (slotDateParts) {
+              const slotMonth = slotDateParts[1]; // e.g., "Nov"
+              const slotDay = parseInt(slotDateParts[2]); // e.g., 12
+              
+              // Get month and day from appointment date
+              const aptMonth = aptDate.toLocaleDateString('en-US', { month: 'short' }); // e.g., "Nov"
+              const aptDay = aptDate.getDate();
+              
+              dateMatch = slotMonth === aptMonth && slotDay === aptDay;
+            } else {
+              // If we can't parse the date, match by time and type only
+              dateMatch = true; // Assume match if we can't parse
+            }
+          } catch (e) {
+            // If date parsing fails, match by time and type only
+            dateMatch = true;
+          }
+          
+          return slotTimeMatch && slotTypeMatch && dateMatch;
+        });
+        
+        return {
+          ...slot,
+          available: !isBooked && slot.available
+        };
+      });
+      
+      return {
+        ...provider,
+        slots: updatedSlots
+      };
+    });
+  };
+
+  // Fetch providers and appointments from API
   useEffect(() => {
-    async function fetchProviders() {
+    async function fetchProvidersAndAppointments() {
       try {
         setLoading(true);
         setError(null);
         
-        const response = await fetch('/api/doctors');
-        const result = await response.json();
+        // Fetch providers
+        const providersResponse = await fetch('/api/doctors');
+        const providersResult = await providersResponse.json();
         
-        if (result.success && result.data && result.data.length > 0) {
-          console.log(`✅ Loaded ${result.data.length} providers from ${result.source || 'API'}`);
-          setProviders(result.data);
-        } else if (result.data && result.data.length === 0) {
-          // API returned empty array
+        let providersData: Provider[] = [];
+        if (providersResult.success && providersResult.data && providersResult.data.length > 0) {
+          console.log(`✅ Loaded ${providersResult.data.length} providers from ${providersResult.source || 'API'}`);
+          providersData = providersResult.data;
+        } else if (providersResult.data && providersResult.data.length === 0) {
           console.warn("API returned empty array, using mock providers");
-          setProviders(mockProviders);
+          providersData = mockProviders;
         } else {
-          // Fallback to mock data if API fails
           console.warn("API returned no data, using mock providers");
-          setProviders(mockProviders);
+          providersData = mockProviders;
+        }
+        
+        // Fetch existing appointments to mark slots as unavailable
+        try {
+          const appointmentsResponse = await fetch('/api/appointments');
+          const appointmentsResult = await appointmentsResponse.json();
+          
+          if (appointmentsResult.success && appointmentsResult.appointments) {
+            // Mark booked slots as unavailable
+            const updatedProviders = markBookedSlots(providersData, appointmentsResult.appointments);
+            setProviders(updatedProviders);
+          } else {
+            setProviders(providersData);
+          }
+        } catch (aptErr) {
+          console.error("Error fetching appointments:", aptErr);
+          // Continue with providers even if appointments fetch fails
+          setProviders(providersData);
         }
       } catch (err) {
         console.error("Error fetching providers:", err);
         setError("Failed to load providers. Using mock data.");
-        // Fallback to mock data on error
         setProviders(mockProviders);
       } finally {
         setLoading(false);
       }
     }
     
-    fetchProviders();
+    fetchProvidersAndAppointments();
   }, []);
 
   const handleSearch = async (query: string, filters: FilterState) => {
@@ -249,11 +334,43 @@ export default function SchedulingPage() {
         throw new Error(result.error || 'Failed to create appointment');
       }
 
-      // Success!
+      // Success! Mark the slot as unavailable in the UI
+      setProviders(prevProviders => {
+        return prevProviders.map(provider => {
+          if (provider.id === selectedProviderData.id) {
+            return {
+              ...provider,
+              slots: provider.slots.map(slot => {
+                if (slot.id === selectedSlot) {
+                  return {
+                    ...slot,
+                    available: false
+                  };
+                }
+                return slot;
+              })
+            };
+          }
+          return provider;
+        });
+      });
+
       setIsConfirmed(true);
       setIsBookingOpen(false);
       setSelectedProvider(null);
       setSelectedSlot(null);
+      
+      // Refresh appointments to ensure all slots are up to date
+      try {
+        const appointmentsResponse = await fetch('/api/appointments');
+        const appointmentsResult = await appointmentsResponse.json();
+        
+        if (appointmentsResult.success && appointmentsResult.appointments) {
+          setProviders(prevProviders => markBookedSlots(prevProviders, appointmentsResult.appointments));
+        }
+      } catch (refreshErr) {
+        console.error("Error refreshing appointments:", refreshErr);
+      }
       
       // Show success message for 5 seconds
       setTimeout(() => setIsConfirmed(false), 5000);
