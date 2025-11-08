@@ -82,8 +82,10 @@ export default function ExactDashboard() {
           />
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="h-9 w-9">
-            <Settings className="h-5 w-5 text-gray-600" />
+          <Button asChild variant="ghost" size="icon" className="h-9 w-9">
+            <Link href="/settings">
+              <Settings className="h-5 w-5 text-gray-600" />
+            </Link>
           </Button>
           <Button variant="ghost" size="icon" className="h-9 w-9">
             <BarChart3 className="h-5 w-5 text-gray-600" />

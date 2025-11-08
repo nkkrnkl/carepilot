@@ -31,8 +31,10 @@ export function PatientNavbar() {
             <Button variant="ghost" size="icon" aria-label="Notifications">
               <Bell className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" size="icon" aria-label="Settings">
-              <Settings className="h-5 w-5" />
+            <Button asChild variant="ghost" size="icon" aria-label="Settings">
+              <Link href="/settings">
+                <Settings className="h-5 w-5" />
+              </Link>
             </Button>
             <Avatar>
               <AvatarFallback className="bg-blue-600 text-white">
