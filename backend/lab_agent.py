@@ -1,12 +1,15 @@
 """
-Lab Report Analysis Agent using LangGraph and K2 API
+Lab Report Processing Agent using LangGraph
 
-This module implements a LangGraph-based agent that analyzes lab reports
-using a 4-step workflow with RAG queries to PineconeVectorStore.
+This module implements a LangGraph-based agent that processes lab reports
+by extracting text from PDF/PNG files, parsing lab parameters using LLM,
+and storing the data in Pinecone following the same pattern as claims_agent.
 """
 
 from typing import Dict, List, Any, Optional, TypedDict
 import json
+import os
+from pathlib import Path
 
 try:
     from langgraph.graph import StateGraph, END
@@ -17,31 +20,39 @@ except ImportError:
 
 from pinecone_store import PineconeVectorStore
 from api import K2APIClient
+from document_processor import DocumentProcessor
+
+# For image processing (PNG/JPG)
+try:
+    from PIL import Image
+    import pytesseract
+    IMAGE_PROCESSING_AVAILABLE = True
+except ImportError:
+    IMAGE_PROCESSING_AVAILABLE = False
+    print("Warning: Image processing libraries not available. Install with: pip install Pillow pytesseract")
 
 
 # ==================== STATE DEFINITION ====================
 
 class LabAgentState(TypedDict):
-    """State for the Lab Report Analysis Agent"""
+    """State for the Lab Report Processing Agent"""
     # Input
     user_id: str
-    doc_id: Optional[str]
-    doc_type: Optional[str]
+    file_path: str
+    file_type: Optional[str]  # "pdf", "png", "jpg"
     task_description: str
-    analyte: Optional[str]  # Specific analyte to analyze (optional)
     
     # Step outputs
-    step1_retrieval: Optional[Dict[str, Any]]
-    step2_analysis: Optional[Dict[str, Any]]
-    step3_knowledge: Optional[Dict[str, Any]]
-    step4_insights: Optional[Dict[str, Any]]
+    step1_extraction: Optional[Dict[str, Any]]  # Extracted text from file
+    step2_parsing: Optional[Dict[str, Any]]  # Parsed lab parameters
+    step3_storage: Optional[Dict[str, Any]]  # Storage confirmation
     
     # Workflow state
     current_step: int
-    retrieved_lab_report: Optional[str]
-    lab_results: List[Dict[str, Any]]
-    test_definitions: List[Dict[str, Any]]
-    coverage_info: List[Dict[str, Any]]
+    extracted_text: Optional[str]
+    lab_parameters: List[Dict[str, Any]]
+    lab_metadata: Optional[Dict[str, Any]]  # title, date, hospital, doctor, etc.
+    doc_id: Optional[str]
     
     # Final output
     final_result: Optional[Dict[str, Any]]
@@ -50,77 +61,55 @@ class LabAgentState(TypedDict):
 
 # ==================== SYSTEM PROMPTS ====================
 
-MASTER_SYSTEM_PROMPT = """You are 'CarePilot-Lab', an expert AI agent for Lab Report Analysis.
+MASTER_SYSTEM_PROMPT = """You are 'CarePilot-Lab', an expert AI agent for Lab Report Processing.
 
-Your sole purpose is to analyze medical lab reports by executing a precise four-step workflow.
+Your sole purpose is to process lab reports by executing a precise three-step workflow:
+1. Extract text from PDF/PNG files
+2. Parse lab parameters and metadata
+3. Store data in Pinecone vector store
 
 **Your Tools:**
-You have access to a PineconeVectorStore instance with two primary methods:
-
-1. `store.query_kb(query_text: str, top_k: int, filter: dict) -> dict`: Queries the shared 'kb' namespace. This namespace contains:
-   - `source: "lab_test_definition"` (with metadata: `analyte`, `description`, `normal_range`, `clinical_significance`)
-   - `source: "payer_policy"` (with metadata: `payer_id`, `coverage_rules`)
-   - `source: "cpt_code"` (lab test CPT codes)
-   - `source: "loinc_code"` (LOINC codes for lab tests)
-
-2. `store.query_private(query_text: str, user_id: str, doc_types: list, top_k: int) -> dict`: Queries the secure 'private' namespace. This namespace contains:
-   - `doc_type: "lab_report"` (with metadata: `text`, `chunk_index`, `doc_id`, `date_iso`, `analyte`, `value_num`, `value_raw`, `unit`, `ref_low`, `ref_high`, `flag`)
+You have access to a PineconeVectorStore instance with the method:
+- `store.add_user_document(user_id, doc_type, doc_id, text, metadata, ...)`: Stores lab report data in the 'private' namespace with doc_type="lab_report"
 
 **Your Constraints:**
-- **NEVER** query the 'private' namespace without a specific `user_id`.
-- **NEVER** confuse 'kb' data (general lab test definitions) with 'private' data (a user's specific lab results).
-- You must perform the following 4 steps **in order**.
+- You must perform the following 3 steps **in order**.
 - Your output for each step must be a structured JSON object.
+- Lab parameters must be extracted with: name, value, unit, and referenceRange (if available).
+- Metadata should include: title, date, hospital, doctor (if available).
 
-**Workflow Steps:**
-1. Retrieve Lab Report (Extract user's lab data)
-2. Analyze Results (Identify abnormal values, trends, flags)
-3. Query Knowledge Base (Get test definitions and coverage)
-4. Generate Insights (Provide recommendations and explanations)
-
-Always think step by step, query the vector store when needed, and provide structured JSON outputs."""
+Always think step by step, extract all parameters accurately, and provide structured JSON outputs."""
 
 
 STEP_PROMPTS = {
-    1: """**Step 1: Retrieve Lab Report**
+    1: """**Step 1: Extract Text from File**
 
-**Thought:** I must retrieve the user's lab report data from the private namespace. If a specific analyte is requested, I should focus on that.
+**Thought:** I must extract all text content from the uploaded file (PDF or PNG/JPG).
 
 **Your Task:**
-1. Query the private namespace for lab reports matching the user_id and doc_id (if provided)
-2. If analyte is specified, filter for that specific analyte
-3. Extract all lab results with their values, units, reference ranges, and flags
-4. Return a structured JSON response
+1. For PDF files: Use document processor to extract text
+2. For PNG/JPG files: Use OCR (pytesseract) to extract text
+3. Return the extracted text in a structured format
 
 **Expected Output Format:**
 ```json
 {{
   "step": 1,
   "status": "Completed",
-  "report_count": 1,
-  "results_found": 5,
-  "lab_results": [
-    {{
-      "analyte": "A1C",
-      "value": 6.5,
-      "unit": "%",
-      "ref_low": 4.0,
-      "ref_high": 5.7,
-      "flag": "H",
-      "date_iso": "2025-01-15"
-    }}
-  ]
+  "extracted_text": "Full text content from the lab report...",
+  "text_length": 1234,
+  "method": "pdf_extraction" or "ocr"
 }}
 ```""",
 
-    2: """**Step 2: Analyze Results**
+    2: """**Step 2: Parse Lab Parameters**
 
-**Thought:** I must analyze the retrieved lab results to identify abnormal values, trends, and clinical significance.
+**Thought:** I must parse the extracted text to identify all lab parameters, their values, units, and reference ranges. I also need to extract metadata like date, hospital, doctor name.
 
 **Your Task:**
-1. Identify which results are outside normal ranges (flagged as H/L/High/Low)
-2. Assess the clinical significance of abnormal values
-3. Note any patterns or trends if multiple results exist
+1. Identify all lab test parameters (e.g., "Creatinine", "Glucose", "Hemoglobin")
+2. Extract values, units, and reference ranges for each parameter
+3. Extract metadata: report date, hospital name, doctor name, report title
 4. Return a structured JSON response
 
 **Expected Output Format:**
@@ -128,78 +117,47 @@ STEP_PROMPTS = {
 {{
   "step": 2,
   "status": "Completed",
-  "abnormal_count": 2,
-  "abnormal_results": [
+  "lab_metadata": {{
+    "title": "Complete Blood Count",
+    "date": "2024-01-15",
+    "hospital": "General Hospital",
+    "doctor": "Dr. Smith"
+  }},
+  "parameters": [
     {{
-      "analyte": "A1C",
-      "value": 6.5,
-      "flag": "H",
-      "clinical_significance": "Elevated A1C indicates prediabetes or diabetes",
-      "severity": "moderate"
+      "name": "Creatinine",
+      "value": "1.2",
+      "unit": "mg/dL",
+      "referenceRange": "0.6-1.2"
+    }},
+    {{
+      "name": "Glucose",
+      "value": "95",
+      "unit": "mg/dL",
+      "referenceRange": "70-100"
     }}
   ],
-  "summary": "2 out of 5 results are outside normal ranges"
+  "parameter_count": 2
 }}
 ```""",
 
-    3: """**Step 3: Query Knowledge Base**
+    3: """**Step 3: Store in Pinecone**
 
-**Thought:** I must query the knowledge base to get test definitions, normal ranges, clinical significance, and coverage information for the lab tests found.
+**Thought:** I will now store the parsed lab report data in Pinecone using the same pattern as claims_agent. I'll format the text properly and use add_user_document with doc_type="lab_report".
 
 **Your Task:**
-1. Query KB for lab test definitions for each analyte found
-2. Query KB for coverage/authorization rules if applicable
-3. Query KB for CPT/LOINC codes if needed
-4. Return a structured JSON response
+1. Format the lab report data as text for embedding
+2. Store using store.add_user_document with proper metadata
+3. Return confirmation
 
 **Expected Output Format:**
 ```json
 {{
   "step": 3,
   "status": "Completed",
-  "test_definitions": [
-    {{
-      "analyte": "A1C",
-      "description": "Hemoglobin A1C measures average blood glucose over 2-3 months",
-      "normal_range": "4.0-5.7%",
-      "clinical_significance": "Used to diagnose and monitor diabetes"
-    }}
-  ],
-  "coverage_info": [
-    {{
-      "analyte": "A1C",
-      "covered": true,
-      "frequency": "Every 3 months for diabetics"
-    }}
-  ]
-}}
-```""",
-
-    4: """**Step 4: Generate Insights**
-
-**Thought:** I will now synthesize all the information to provide actionable insights, recommendations, and explanations for the user.
-
-**Your Task:**
-1. Combine lab results, analysis, and knowledge base information
-2. Provide clear explanations of what each abnormal result means
-3. Suggest next steps or recommendations
-4. Return a structured JSON response
-
-**Expected Output Format:**
-```json
-{{
-  "step": 4,
-  "status": "Completed",
-  "insights": [
-    {{
-      "analyte": "A1C",
-      "summary": "Your A1C level of 6.5% is elevated, indicating prediabetes",
-      "explanation": "A1C measures your average blood sugar over the past 2-3 months. A level of 6.5% suggests prediabetes.",
-      "recommendation": "Consider lifestyle modifications including diet and exercise. Follow up with your doctor in 3 months for repeat testing.",
-      "urgency": "moderate"
-    }}
-  ],
-  "overall_summary": "Your lab results show 2 abnormal values requiring attention."
+  "vector_id": "chunk_abc123...",
+  "chunk_count": 5,
+  "message": "Lab report stored successfully in Pinecone"
 }}
 ```"""
 }
@@ -208,7 +166,7 @@ STEP_PROMPTS = {
 # ==================== LAB AGENT CLASS ====================
 
 class LabAgent:
-    """Lab Report Analysis Agent using LangGraph and K2 API"""
+    """Lab Report Processing Agent using LangGraph"""
     
     def __init__(
         self,
@@ -230,6 +188,7 @@ class LabAgent:
         
         self.vector_store = vector_store or PineconeVectorStore()
         self.llm_client = llm_client or K2APIClient()
+        self.document_processor = DocumentProcessor()
         
         # Build the workflow graph
         self.workflow = self._build_workflow()
@@ -239,88 +198,101 @@ class LabAgent:
         workflow = StateGraph(LabAgentState)
         
         # Add nodes
-        workflow.add_node("step1_retrieval", self._step1_retrieve_lab_report)
-        workflow.add_node("step2_analysis", self._step2_analyze_results)
-        workflow.add_node("step3_knowledge", self._step3_query_knowledge)
-        workflow.add_node("step4_insights", self._step4_generate_insights)
+        workflow.add_node("step1_extraction", self._step1_extract_text)
+        workflow.add_node("step2_parsing", self._step2_parse_parameters)
+        workflow.add_node("step3_storage", self._step3_store_pinecone)
         
         # Define edges
-        workflow.set_entry_point("step1_retrieval")
-        workflow.add_edge("step1_retrieval", "step2_analysis")
-        workflow.add_edge("step2_analysis", "step3_knowledge")
-        workflow.add_edge("step3_knowledge", "step4_insights")
-        workflow.add_edge("step4_insights", END)
+        workflow.set_entry_point("step1_extraction")
+        workflow.add_edge("step1_extraction", "step2_parsing")
+        workflow.add_edge("step2_parsing", "step3_storage")
+        workflow.add_edge("step3_storage", END)
         
         return workflow.compile()
     
-    def _step1_retrieve_lab_report(self, state: LabAgentState) -> LabAgentState:
-        """Step 1: Retrieve Lab Report"""
-        try:
-            user_id = state["user_id"]
-            doc_id = state.get("doc_id")
-            analyte = state.get("analyte")
-            
-            # Build query text
-            if analyte:
-                query_text = f"lab report {analyte} test result"
+    def _extract_text_from_file(self, file_path: str, file_type: Optional[str]) -> Dict[str, Any]:
+        """Extract text from file (PDF or image)"""
+        file_path_obj = Path(file_path)
+        
+        if not file_path_obj.exists():
+            raise FileNotFoundError(f"File not found: {file_path}")
+        
+        # Determine file type from extension if not provided
+        if not file_type:
+            ext = file_path_obj.suffix.lower()
+            if ext == ".pdf":
+                file_type = "pdf"
+            elif ext in [".png", ".jpg", ".jpeg"]:
+                file_type = ext[1:]  # Remove dot
             else:
-                query_text = "lab report test results values"
-            
-            # Build filter for doc_id if provided
-            additional_filter = None
-            if doc_id:
-                additional_filter = {"doc_id": {"$eq": doc_id}}
-            
-            # Query private namespace for lab reports
-            lab_report_query = self.vector_store.query_private(
-                query_text=query_text,
-                user_id=user_id,
-                doc_types=["lab_report"],
-                top_k=10,
-                additional_filter=additional_filter
+                raise ValueError(f"Unsupported file type: {ext}")
+        
+        # Read file content
+        with open(file_path, "rb") as f:
+            file_content = f.read()
+        
+        # Extract text based on file type
+        if file_type == "pdf":
+            # Use document processor for PDF
+            result = self.document_processor.extract_text(
+                file_content=file_content,
+                file_name=file_path_obj.name,
+                file_type="application/pdf"
             )
             
-            # Extract lab results from matches
-            lab_results = []
-            report_texts = []
+            if not result["success"]:
+                raise Exception(f"PDF extraction failed: {result.get('error', 'Unknown error')}")
             
-            if lab_report_query.get("matches"):
-                for match in lab_report_query["matches"]:
-                    metadata = match.get("metadata", {})
-                    
-                    # Check if this is a lab result (has analyte) or a report chunk (has text)
-                    if metadata.get("analyte"):
-                        # This is a specific lab result
-                        result = {
-                            "analyte": metadata.get("analyte"),
-                            "value_num": metadata.get("value_num"),
-                            "value_raw": metadata.get("value_raw"),
-                            "unit": metadata.get("unit"),
-                            "ref_low": metadata.get("ref_low"),
-                            "ref_high": metadata.get("ref_high"),
-                            "flag": metadata.get("flag"),
-                            "date_iso": metadata.get("date_iso"),
-                            "doc_id": metadata.get("doc_id")
-                        }
-                        lab_results.append(result)
-                    elif metadata.get("text"):
-                        # This is a report chunk
-                        report_texts.append(metadata.get("text", ""))
+            return {
+                "text": result["text"],
+                "method": "pdf_extraction",
+                "text_length": len(result["text"])
+            }
+        
+        elif file_type in ["png", "jpg", "jpeg"]:
+            # Use OCR for images
+            if not IMAGE_PROCESSING_AVAILABLE:
+                raise ImportError(
+                    "Image processing libraries not available. "
+                    "Install with: pip install Pillow pytesseract"
+                )
             
-            # Combine report text
-            combined_report_text = "\n\n".join(report_texts)
+            try:
+                image = Image.open(file_path)
+                # Convert to RGB if necessary
+                if image.mode != "RGB":
+                    image = image.convert("RGB")
+                
+                # Extract text using OCR
+                text = pytesseract.image_to_string(image)
+                
+                return {
+                    "text": text,
+                    "method": "ocr",
+                    "text_length": len(text)
+                }
+            except Exception as e:
+                raise Exception(f"OCR extraction failed: {str(e)}")
+        
+        else:
+            raise ValueError(f"Unsupported file type: {file_type}")
+    
+    def _step1_extract_text(self, state: LabAgentState) -> LabAgentState:
+        """Step 1: Extract Text from File"""
+        try:
+            file_path = state["file_path"]
+            file_type = state.get("file_type")
             
-            # Use LLM to process and structure the response
-            user_message = f"""Based on the following information, complete Step 1: Retrieve Lab Report.
+            # Extract text from file
+            extraction_result = self._extract_text_from_file(file_path, file_type)
+            
+            # Use LLM to structure the response
+            user_message = f"""Based on the file extraction, complete Step 1: Extract Text from File.
 
-**Lab Report Data Found:**
-{json.dumps(lab_results, indent=2) if lab_results else "No structured lab results found"}
-
-**Report Text Chunks:**
-{combined_report_text[:2000] if combined_report_text else "No report text found"}
-
-**Task:** {state.get("task_description", "Analyze the lab report")}
-**Analyte Filter:** {analyte or "None (analyze all)"}
+**Extraction Result:**
+- Method: {extraction_result['method']}
+- Text Length: {extraction_result['text_length']} characters
+- Extracted Text (first 500 chars): {extraction_result['text'][:500]}...
 
 {STEP_PROMPTS[1]}
 
@@ -339,34 +311,35 @@ Please provide your response in the exact JSON format specified."""
                 step_result = self._extract_json_from_response(content)
                 
                 if step_result:
-                    state["step1_retrieval"] = step_result
+                    step_result["extracted_text"] = extraction_result["text"]
+                    step_result["text_length"] = extraction_result["text_length"]
+                    step_result["method"] = extraction_result["method"]
+                    state["step1_extraction"] = step_result
                 else:
                     # Fallback: create structured response
-                    state["step1_retrieval"] = {
+                    state["step1_extraction"] = {
                         "step": 1,
                         "status": "Completed",
-                        "report_count": len(set([r.get("doc_id") for r in lab_results if r.get("doc_id")])),
-                        "results_found": len(lab_results),
-                        "lab_results": lab_results
+                        "extracted_text": extraction_result["text"],
+                        "text_length": extraction_result["text_length"],
+                        "method": extraction_result["method"]
                     }
             else:
                 # Fallback response
-                state["step1_retrieval"] = {
+                state["step1_extraction"] = {
                     "step": 1,
                     "status": "Completed",
-                    "report_count": len(set([r.get("doc_id") for r in lab_results if r.get("doc_id")])),
-                    "results_found": len(lab_results),
-                    "lab_results": lab_results
+                    "extracted_text": extraction_result["text"],
+                    "text_length": extraction_result["text_length"],
+                    "method": extraction_result["method"]
                 }
             
-            # Store in state
-            state["retrieved_lab_report"] = combined_report_text
-            state["lab_results"] = lab_results
+            state["extracted_text"] = extraction_result["text"]
             state["current_step"] = 1
             
         except Exception as e:
             state["error"] = f"Step 1 error: {str(e)}"
-            state["step1_retrieval"] = {
+            state["step1_extraction"] = {
                 "step": 1,
                 "status": "Error",
                 "error": str(e)
@@ -374,70 +347,131 @@ Please provide your response in the exact JSON format specified."""
         
         return state
     
-    def _step2_analyze_results(self, state: LabAgentState) -> LabAgentState:
-        """Step 2: Analyze Results"""
+    def _step2_parse_parameters(self, state: LabAgentState) -> LabAgentState:
+        """Step 2: Parse Lab Parameters"""
         try:
-            lab_results = state.get("lab_results", [])
+            extracted_text = state.get("extracted_text")
             
-            # Use LLM to process and structure the response
-            user_message = f"""Based on the following lab results, complete Step 2: Analyze Results.
+            if not extracted_text:
+                raise ValueError("No extracted text available from Step 1")
+            
+            # Use LLM to parse lab parameters with retry logic
+            # Increase text limit but be smart about it
+            text_limit = 8000  # Increased from 3000 for better parsing
+            text_to_parse = extracted_text[:text_limit] if len(extracted_text) > text_limit else extracted_text
+            
+            if len(extracted_text) > text_limit:
+                # Add note that text was truncated
+                text_to_parse += f"\n\n[Note: Text truncated from {len(extracted_text)} to {text_limit} characters. Please extract all parameters visible above.]"
+            
+            user_message = f"""Based on the extracted text from the lab report, complete Step 2: Parse Lab Parameters.
 
-**Lab Results:**
-{json.dumps(lab_results, indent=2)}
-
-**Previous Step Output:**
-{json.dumps(state.get("step1_retrieval", {}), indent=2)}
+**Extracted Text:**
+{text_to_parse}
 
 {STEP_PROMPTS[2]}
 
-Please provide your response in the exact JSON format specified."""
+CRITICAL: You MUST respond with ONLY valid JSON. Do not include any explanatory text outside the JSON object. The JSON must be complete and well-formed.
+
+Please provide your response in the exact JSON format specified. Extract ALL lab parameters you can find, including their values, units, and reference ranges."""
             
             messages = [
                 {"role": "system", "content": MASTER_SYSTEM_PROMPT},
                 {"role": "user", "content": user_message}
             ]
             
-            response = self.llm_client.chat(messages)
+            # Retry logic for parsing
+            max_retries = 2
+            step_result = None
+            last_error = None
+            
+            for attempt in range(max_retries):
+                try:
+                    response = self.llm_client.chat(messages)
+                    
+                    if not response or "choices" not in response:
+                        last_error = "No response from LLM"
+                        if attempt < max_retries - 1:
+                            continue
+                        break
+                    
+                    content = response["choices"][0]["message"]["content"]
+                    
+                    # Log the raw response for debugging (first 500 chars)
+                    if attempt == 0:
+                        print(f"[LabAgent] Step 2 LLM response (first 500 chars): {content[:500]}")
+                    
+                    step_result = self._extract_json_from_response(content)
+                    
+                    if step_result:
+                        # Validate the extracted result
+                        if not isinstance(step_result, dict):
+                            last_error = f"Step result is not a dict: {type(step_result)}"
+                            if attempt < max_retries - 1:
+                                continue
+                            break
+                        
+                        # Validate parameters structure
+                        parameters = step_result.get("parameters", [])
+                        if parameters and not isinstance(parameters, list):
+                            last_error = f"Parameters is not a list: {type(parameters)}"
+                            if attempt < max_retries - 1:
+                                continue
+                            break
+                        
+                        # Success - break out of retry loop
+                        break
+                    else:
+                        last_error = "Failed to extract JSON from response"
+                        if attempt < max_retries - 1:
+                            # Add more explicit instruction for retry
+                            messages.append({
+                                "role": "assistant",
+                                "content": content
+                            })
+                            messages.append({
+                                "role": "user",
+                                "content": "Your previous response was not valid JSON. Please respond with ONLY a valid JSON object, no other text. Use this exact format:\n```json\n{...}\n```"
+                            })
+                            continue
+                
+                except Exception as e:
+                    last_error = f"Exception during parsing attempt {attempt + 1}: {str(e)}"
+                    if attempt < max_retries - 1:
+                        continue
+                    break
             
             # Parse LLM response
-            if response and "choices" in response:
-                content = response["choices"][0]["message"]["content"]
-                step_result = self._extract_json_from_response(content)
-                
-                if step_result:
-                    state["step2_analysis"] = step_result
-                else:
-                    # Fallback: analyze manually
-                    abnormal_results = [
-                        r for r in lab_results 
-                        if r.get("flag") in ["H", "L", "High", "Low", "↑", "↓"]
-                    ]
-                    state["step2_analysis"] = {
-                        "step": 2,
-                        "status": "Completed",
-                        "abnormal_count": len(abnormal_results),
-                        "abnormal_results": abnormal_results,
-                        "summary": f"{len(abnormal_results)} out of {len(lab_results)} results are outside normal ranges"
-                    }
+            if step_result:
+                state["step2_parsing"] = step_result
+                state["lab_parameters"] = step_result.get("parameters", [])
+                state["lab_metadata"] = step_result.get("lab_metadata", {})
+                print(f"[LabAgent] Step 2 parsed successfully: {len(state['lab_parameters'])} parameters extracted")
             else:
-                # Fallback response
-                abnormal_results = [
-                    r for r in lab_results 
-                    if r.get("flag") in ["H", "L", "High", "Low", "↑", "↓"]
-                ]
-                state["step2_analysis"] = {
+                # Log the failure for debugging
+                error_msg = f"Failed to parse lab parameters after {max_retries} attempts"
+                if last_error:
+                    error_msg += f": {last_error}"
+                print(f"[LabAgent] ERROR: {error_msg}")
+                
+                # Don't silently fail - raise an error so it's visible
+                state["error"] = error_msg
+                state["step2_parsing"] = {
                     "step": 2,
-                    "status": "Completed",
-                    "abnormal_count": len(abnormal_results),
-                    "abnormal_results": abnormal_results,
-                    "summary": f"{len(abnormal_results)} out of {len(lab_results)} results are outside normal ranges"
+                    "status": "Error",
+                    "error": error_msg,
+                    "lab_metadata": {},
+                    "parameters": [],
+                    "parameter_count": 0
                 }
+                state["lab_parameters"] = []
+                state["lab_metadata"] = {}
             
             state["current_step"] = 2
             
         except Exception as e:
             state["error"] = f"Step 2 error: {str(e)}"
-            state["step2_analysis"] = {
+            state["step2_parsing"] = {
                 "step": 2,
                 "status": "Error",
                 "error": str(e)
@@ -445,73 +479,84 @@ Please provide your response in the exact JSON format specified."""
         
         return state
     
-    def _step3_query_knowledge(self, state: LabAgentState) -> LabAgentState:
-        """Step 3: Query Knowledge Base"""
+    def _step3_store_pinecone(self, state: LabAgentState) -> LabAgentState:
+        """Step 3: Store in Pinecone"""
         try:
-            lab_results = state.get("lab_results", [])
-            abnormal_results = state.get("step2_analysis", {}).get("abnormal_results", [])
+            user_id = state["user_id"]
+            doc_id = state.get("doc_id")
+            lab_parameters = state.get("lab_parameters", [])
+            lab_metadata = state.get("lab_metadata", {})
+            extracted_text = state.get("extracted_text", "")
             
-            # Get unique analytes
-            analytes = list(set([
-                r.get("analyte") for r in lab_results 
-                if r.get("analyte")
-            ]))
+            if not doc_id:
+                # Generate a doc_id if not provided
+                import uuid
+                doc_id = f"lab-{uuid.uuid4().hex[:8]}"
+                state["doc_id"] = doc_id
             
-            # Query KB for test definitions
-            test_definitions = []
-            for analyte in analytes:
-                definition_query = self.vector_store.query_kb(
-                    query_text=f"{analyte} lab test definition normal range clinical significance",
-                    top_k=3,
-                    filter={"source": {"$eq": "lab_test_definition"}}
-                )
+            # Build formatted text for Pinecone storage (same format as upload_lab_report.py)
+            title = lab_metadata.get("title") or "Lab Report"
+            date = lab_metadata.get("date") or "Date unknown"
+            hospital = lab_metadata.get("hospital") or "Hospital unknown"
+            doctor = lab_metadata.get("doctor") or "Doctor unknown"
+            
+            text = f"""Title: {title}
+Date: {date}
+Hospital: {hospital}
+Doctor: {doctor}
+Parameters:
+"""
+            
+            # Add parameters
+            for param in lab_parameters:
+                name = param.get("name", "")
+                value = param.get("value", "")
+                unit = param.get("unit") or ""
+                ref_range = param.get("referenceRange") or ""
                 
-                if definition_query.get("matches"):
-                    for match in definition_query["matches"]:
-                        metadata = match.get("metadata", {})
-                        if metadata.get("analyte") == analyte or analyte.lower() in str(metadata.get("text", "")).lower():
-                            test_definitions.append({
-                                "analyte": analyte,
-                                "description": metadata.get("description") or metadata.get("text", ""),
-                                "normal_range": metadata.get("normal_range", ""),
-                                "clinical_significance": metadata.get("clinical_significance", "")
-                            })
-                            break
+                if ref_range:
+                    text += f"{name}: {value} {unit} (Range: {ref_range})\n"
+                else:
+                    text += f"{name}: {value} {unit}\n"
             
-            # Query KB for coverage information
-            coverage_info = []
-            for analyte in analytes:
-                coverage_query = self.vector_store.query_kb(
-                    query_text=f"{analyte} lab test coverage authorization insurance",
-                    top_k=3,
-                    filter={"source": {"$eq": "payer_policy"}}
-                )
-                
-                if coverage_query.get("matches"):
-                    for match in coverage_query["matches"]:
-                        metadata = match.get("metadata", {})
-                        coverage_info.append({
-                            "analyte": analyte,
-                            "covered": True,
-                            "policy_text": metadata.get("text", "")
-                        })
-                        break
+            # Store in Pinecone using the SAME method as claims_agent
+            # Use "lab_report" as doc_type, chunk with sentence strategy
+            result_data = self.vector_store.add_user_document(
+                user_id=user_id,
+                doc_type="lab_report",
+                doc_id=doc_id,
+                text=text,
+                metadata={
+                    "title": title,
+                    "date": date,
+                    "hospital": hospital,
+                    "doctor": doctor,
+                    "type": "lab_report",
+                    "parameter_count": len(lab_parameters),
+                },
+                chunk_text=True,  # Enable chunking for better retrieval
+                chunk_size=1000,
+                chunk_overlap=200,
+                chunk_strategy="sentence"  # Lab reports use sentence chunking
+            )
             
-            # Use LLM to process and structure the response
-            user_message = f"""Based on the following information, complete Step 3: Query Knowledge Base.
+            # Handle both single vector ID and list of vector IDs (from chunking)
+            if isinstance(result_data, list):
+                vector_ids = result_data
+                vector_id = vector_ids[0]  # Use first chunk ID as primary
+                chunk_count = len(vector_ids)
+            else:
+                vector_ids = [result_data]
+                vector_id = result_data
+                chunk_count = 1
+            
+            # Use LLM to structure the response
+            user_message = f"""Based on the storage operation, complete Step 3: Store in Pinecone.
 
-**Lab Results:**
-{json.dumps(lab_results, indent=2)}
-
-**Test Definitions Found:**
-{json.dumps(test_definitions, indent=2)}
-
-**Coverage Information Found:**
-{json.dumps(coverage_info, indent=2)}
-
-**Previous Steps:**
-- Step 1: {json.dumps(state.get("step1_retrieval", {}), indent=2)}
-- Step 2: {json.dumps(state.get("step2_analysis", {}), indent=2)}
+**Storage Result:**
+- Vector ID: {vector_id}
+- Chunk Count: {chunk_count}
+- Parameters Stored: {len(lab_parameters)}
 
 {STEP_PROMPTS[3]}
 
@@ -530,32 +575,62 @@ Please provide your response in the exact JSON format specified."""
                 step_result = self._extract_json_from_response(content)
                 
                 if step_result:
-                    state["step3_knowledge"] = step_result
+                    step_result["vector_id"] = vector_id
+                    step_result["chunk_count"] = chunk_count
+                    state["step3_storage"] = step_result
                 else:
                     # Fallback: create structured response
-                    state["step3_knowledge"] = {
+                    state["step3_storage"] = {
                         "step": 3,
                         "status": "Completed",
-                        "test_definitions": test_definitions,
-                        "coverage_info": coverage_info
+                        "vector_id": vector_id,
+                        "chunk_count": chunk_count,
+                        "message": f"Lab report stored successfully in Pinecone ({chunk_count} chunk{'s' if chunk_count > 1 else ''})"
                     }
             else:
                 # Fallback response
-                state["step3_knowledge"] = {
+                state["step3_storage"] = {
                     "step": 3,
                     "status": "Completed",
-                    "test_definitions": test_definitions,
-                    "coverage_info": coverage_info
+                    "vector_id": vector_id,
+                    "chunk_count": chunk_count,
+                    "message": f"Lab report stored successfully in Pinecone ({chunk_count} chunk{'s' if chunk_count > 1 else ''})"
                 }
             
-            # Store in state
-            state["test_definitions"] = test_definitions
-            state["coverage_info"] = coverage_info
+            # Compile final result
+            # Check if parsing was successful
+            parsing_result = state.get("step2_parsing", {})
+            has_error = state.get("error") is not None
+            parsing_failed = parsing_result.get("status") == "Error" or len(lab_parameters) == 0
+            
+            # Determine if workflow truly completed successfully
+            workflow_success = not has_error and not parsing_failed and len(lab_parameters) > 0
+            
+            state["final_result"] = {
+                "workflow_completed": workflow_success,
+                "steps": {
+                    "step1": state.get("step1_extraction", {}),
+                    "step2": state.get("step2_parsing", {}),
+                    "step3": state.get("step3_storage", {})
+                },
+                "user_id": user_id,
+                "doc_id": doc_id,
+                "lab_metadata": lab_metadata,
+                "parameters": lab_parameters,
+                "parameter_count": len(lab_parameters),
+                "pinecone_stored": True,
+                "vector_id": vector_id,
+                "chunk_count": chunk_count,
+                "error": state.get("error"),
+                "parsing_failed": parsing_failed,
+                "has_parameters": len(lab_parameters) > 0
+            }
+            
             state["current_step"] = 3
             
         except Exception as e:
             state["error"] = f"Step 3 error: {str(e)}"
-            state["step3_knowledge"] = {
+            state["step3_storage"] = {
                 "step": 3,
                 "status": "Error",
                 "error": str(e)
@@ -563,169 +638,120 @@ Please provide your response in the exact JSON format specified."""
         
         return state
     
-    def _step4_generate_insights(self, state: LabAgentState) -> LabAgentState:
-        """Step 4: Generate Insights"""
-        try:
-            # Use LLM to process and structure the response
-            user_message = f"""Based on the completed workflow, complete Step 4: Generate Insights.
-
-**Previous Steps:**
-- Step 1 (Retrieval): {json.dumps(state.get("step1_retrieval", {}), indent=2)}
-- Step 2 (Analysis): {json.dumps(state.get("step2_analysis", {}), indent=2)}
-- Step 3 (Knowledge): {json.dumps(state.get("step3_knowledge", {}), indent=2)}
-
-**Lab Results:**
-{json.dumps(state.get("lab_results", []), indent=2)}
-
-**Test Definitions:**
-{json.dumps(state.get("test_definitions", []), indent=2)}
-
-**Coverage Information:**
-{json.dumps(state.get("coverage_info", []), indent=2)}
-
-{STEP_PROMPTS[4]}
-
-Please provide your response in the exact JSON format specified."""
-            
-            messages = [
-                {"role": "system", "content": MASTER_SYSTEM_PROMPT},
-                {"role": "user", "content": user_message}
-            ]
-            
-            response = self.llm_client.chat(messages)
-            
-            # Parse LLM response
-            if response and "choices" in response:
-                content = response["choices"][0]["message"]["content"]
-                step_result = self._extract_json_from_response(content)
-                
-                if step_result:
-                    state["step4_insights"] = step_result
-                else:
-                    # Fallback: create structured response
-                    abnormal_results = state.get("step2_analysis", {}).get("abnormal_results", [])
-                    insights = []
-                    for result in abnormal_results:
-                        analyte = result.get("analyte", "Unknown")
-                        value = result.get("value_num") or result.get("value_raw", "N/A")
-                        flag = result.get("flag", "")
-                        
-                        insights.append({
-                            "analyte": analyte,
-                            "summary": f"Your {analyte} level of {value} is {flag.lower()}",
-                            "explanation": f"The {analyte} test result is outside the normal range.",
-                            "recommendation": "Please consult with your healthcare provider for further evaluation.",
-                            "urgency": "moderate"
-                        })
-                    
-                    state["step4_insights"] = {
-                        "step": 4,
-                        "status": "Completed",
-                        "insights": insights,
-                        "overall_summary": f"Your lab results show {len(abnormal_results)} abnormal values requiring attention."
-                    }
-            else:
-                # Fallback response
-                abnormal_results = state.get("step2_analysis", {}).get("abnormal_results", [])
-                insights = []
-                for result in abnormal_results:
-                    analyte = result.get("analyte", "Unknown")
-                    value = result.get("value_num") or result.get("value_raw", "N/A")
-                    flag = result.get("flag", "")
-                    
-                    insights.append({
-                        "analyte": analyte,
-                        "summary": f"Your {analyte} level of {value} is {flag.lower()}",
-                        "explanation": f"The {analyte} test result is outside the normal range.",
-                        "recommendation": "Please consult with your healthcare provider for further evaluation.",
-                        "urgency": "moderate"
-                    })
-                
-                state["step4_insights"] = {
-                    "step": 4,
-                    "status": "Completed",
-                    "insights": insights,
-                    "overall_summary": f"Your lab results show {len(abnormal_results)} abnormal values requiring attention."
-                }
-            
-            # Compile final result
-            state["final_result"] = {
-                "workflow_completed": True,
-                "steps": {
-                    "step1": state.get("step1_retrieval", {}),
-                    "step2": state.get("step2_analysis", {}),
-                    "step3": state.get("step3_knowledge", {}),
-                    "step4": state.get("step4_insights", {})
-                },
-                "user_id": state["user_id"],
-                "doc_id": state.get("doc_id"),
-                "insights": state.get("step4_insights", {}).get("insights", [])
-            }
-            
-            state["current_step"] = 4
-            
-        except Exception as e:
-            state["error"] = f"Step 4 error: {str(e)}"
-            state["step4_insights"] = {
-                "step": 4,
-                "status": "Error",
-                "error": str(e)
-            }
-        
-        return state
-    
     def _extract_json_from_response(self, content: str) -> Optional[Dict[str, Any]]:
-        """Extract JSON from LLM response"""
-        try:
-            # Try to find JSON in the response
-            import re
-            json_match = re.search(r'\{.*\}', content, re.DOTALL)
-            if json_match:
-                json_str = json_match.group(0)
-                return json.loads(json_str)
-            else:
-                # Try parsing the entire content as JSON
-                return json.loads(content)
-        except Exception:
+        """
+        Extract JSON from LLM response with robust parsing
+        
+        Handles:
+        - JSON in code blocks (```json ... ```)
+        - Multiple JSON objects
+        - Nested JSON structures
+        - Malformed JSON with recovery
+        """
+        import re
+        
+        if not content or not isinstance(content, str):
             return None
+        
+        # Strategy 1: Try to find JSON in code blocks first
+        code_block_pattern = r'```(?:json)?\s*(\{.*?\})\s*```'
+        code_block_match = re.search(code_block_pattern, content, re.DOTALL)
+        if code_block_match:
+            try:
+                json_str = code_block_match.group(1)
+                return json.loads(json_str)
+            except (json.JSONDecodeError, AttributeError):
+                pass
+        
+        # Strategy 2: Find JSON object with balanced braces (more robust)
+        # Count braces to find the complete JSON object
+        brace_count = 0
+        start_idx = -1
+        
+        for i, char in enumerate(content):
+            if char == '{':
+                if brace_count == 0:
+                    start_idx = i
+                brace_count += 1
+            elif char == '}':
+                brace_count -= 1
+                if brace_count == 0 and start_idx != -1:
+                    # Found complete JSON object
+                    try:
+                        json_str = content[start_idx:i+1]
+                        return json.loads(json_str)
+                    except json.JSONDecodeError:
+                        # Try next JSON object
+                        start_idx = -1
+                        continue
+        
+        # Strategy 3: Try greedy match (fallback)
+        json_match = re.search(r'\{.*\}', content, re.DOTALL)
+        if json_match:
+            try:
+                json_str = json_match.group(0)
+                # Try to fix common issues
+                # Remove trailing commas before closing braces
+                json_str = re.sub(r',\s*}', '}', json_str)
+                json_str = re.sub(r',\s*]', ']', json_str)
+                return json.loads(json_str)
+            except json.JSONDecodeError:
+                pass
+        
+        # Strategy 4: Try parsing entire content
+        try:
+            return json.loads(content.strip())
+        except json.JSONDecodeError:
+            pass
+        
+        # Strategy 5: Try to extract JSON from markdown-style responses
+        # Look for content between first { and last }
+        first_brace = content.find('{')
+        last_brace = content.rfind('}')
+        if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+            try:
+                json_str = content[first_brace:last_brace+1]
+                return json.loads(json_str)
+            except json.JSONDecodeError:
+                pass
+        
+        return None
     
-    def analyze_lab_report(
+    def process_lab(
         self,
         user_id: str,
+        file_path: str,
+        file_type: Optional[str] = None,
         doc_id: Optional[str] = None,
-        doc_type: Optional[str] = None,
-        analyte: Optional[str] = None,
-        task_description: str = "Analyze the lab report"
+        task_description: str = "Process the lab report and extract all parameters"
     ) -> Dict[str, Any]:
         """
-        Analyze a lab report using the 4-step workflow
+        Process a lab report using the 3-step workflow
         
         Args:
             user_id: User identifier
-            doc_id: Document ID (optional, to analyze specific report)
-            doc_type: Document type (optional, defaults to "lab_report")
-            analyte: Specific analyte to analyze (optional, analyzes all if not provided)
+            file_path: Path to the lab report file (PDF or PNG/JPG)
+            file_type: File type ("pdf", "png", "jpg") - auto-detected if not provided
+            doc_id: Document ID (optional, will be generated if not provided)
             task_description: Task description
             
         Returns:
-            Final workflow result
+            Final workflow result with parsed parameters and storage confirmation
         """
         # Initialize state
         initial_state: LabAgentState = {
             "user_id": user_id,
-            "doc_id": doc_id,
-            "doc_type": doc_type or "lab_report",
+            "file_path": file_path,
+            "file_type": file_type,
             "task_description": task_description,
-            "analyte": analyte,
-            "step1_retrieval": None,
-            "step2_analysis": None,
-            "step3_knowledge": None,
-            "step4_insights": None,
+            "step1_extraction": None,
+            "step2_parsing": None,
+            "step3_storage": None,
             "current_step": 0,
-            "retrieved_lab_report": None,
-            "lab_results": [],
-            "test_definitions": [],
-            "coverage_info": [],
+            "extracted_text": None,
+            "lab_parameters": [],
+            "lab_metadata": None,
+            "doc_id": doc_id,
             "final_result": None,
             "error": None
         }
@@ -748,16 +774,18 @@ if __name__ == "__main__":
     # Initialize agent
     agent = LabAgent()
     
-    # Analyze a lab report
+    # Process a lab report
     print("=" * 60)
-    print("LAB REPORT ANALYSIS AGENT - EXAMPLE")
+    print("LAB REPORT PROCESSING AGENT - EXAMPLE")
     print("=" * 60)
     
-    result = agent.analyze_lab_report(
-        user_id="default-user",
-        doc_id=None,  # Analyze all lab reports for this user
-        analyte=None,  # Analyze all analytes, or specify "A1C" for specific analyte
-        task_description="A new lab report has been uploaded. Please analyze the results and provide insights."
+    # Example: Process a PDF lab report
+    result = agent.process_lab(
+        user_id="user-123",
+        file_path="path/to/lab_report.pdf",
+        file_type="pdf",
+        doc_id="lab-abc-456",
+        task_description="Process the lab report and extract all parameters"
     )
     
     print("\n" + "=" * 60)

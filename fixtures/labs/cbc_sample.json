@@ -1,0 +1,33 @@
+{
+  "hospital": "Cleveland Clinic",
+  "doctor": "Dr. Smith",
+  "date": "2024-01-15",
+  "title": "CBC Panel",
+  "parameters": [
+    {
+      "name": "Hemoglobin",
+      "value": 13.2,
+      "unit": "g/dL",
+      "referenceRange": "12-16"
+    },
+    {
+      "name": "White Blood Cell Count",
+      "value": 6.5,
+      "unit": "K/µL",
+      "referenceRange": "4.5-11.0"
+    },
+    {
+      "name": "Platelet Count",
+      "value": 250,
+      "unit": "K/µL",
+      "referenceRange": "150-450"
+    },
+    {
+      "name": "Red Blood Cell Count",
+      "value": 4.5,
+      "unit": "M/µL",
+      "referenceRange": "4.0-5.5"
+    }
+  ]
+}
+
