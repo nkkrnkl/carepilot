@@ -118,8 +118,13 @@ export default function SchedulingPage() {
         const response = await fetch('/api/doctors');
         const result = await response.json();
         
-        if (result.success && result.data) {
+        if (result.success && result.data && result.data.length > 0) {
+          console.log(`✅ Loaded ${result.data.length} providers from ${result.source || 'API'}`);
           setProviders(result.data);
+        } else if (result.data && result.data.length === 0) {
+          // API returned empty array
+          console.warn("API returned empty array, using mock providers");
+          setProviders(mockProviders);
         } else {
           // Fallback to mock data if API fails
           console.warn("API returned no data, using mock providers");

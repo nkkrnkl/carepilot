@@ -21,11 +21,15 @@ export async function GET(request: Request) {
     // Download doctors data from Azure Blob Storage
     let doctors = await downloadDoctorsData();
     
-    // If no doctors found in blob storage, return empty array
-    // In production, you might want to fall back to a local file or database
+    // If no doctors found in blob storage, return empty array with error info
     if (doctors.length === 0) {
-      console.warn("No doctors found in Azure Blob Storage, returning empty array");
-      return NextResponse.json([]);
+      console.warn("No doctors found in Azure Blob Storage");
+      return NextResponse.json({
+        success: false,
+        count: 0,
+        data: [],
+        error: "No doctors data found in Azure Blob Storage"
+      });
     }
     
     // Apply filters
@@ -60,7 +64,8 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       count: doctors.length,
-      data: doctors
+      data: doctors,
+      source: "azure-blob-storage"
     });
     
   } catch (error: any) {
