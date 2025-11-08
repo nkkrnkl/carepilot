@@ -1,15 +1,3 @@
-# How to Run the Lab Agent
-
-## ✅ Your Setup is Ready
-
-Your `.env` file at `/Users/abhinavbarat/Documents/carepilot/.env` has all the required API keys:
-- ✓ PINECONE_API_KEY
-- ✓ AZURE_OPENAI_ENDPOINT  
-- ✓ AZURE_OPENAI_API_KEY
-- ✓ K2_API_KEY
-
-## Quick Start
-
 ### Option 1: Use from Frontend (Easiest - Already Working!)
 
 The frontend is already set up and working. Just:
@@ -40,7 +28,7 @@ If you want to use the LangGraph-based lab agent directly:
 
 ```bash
 # Create virtual environment
-cd /Users/abhinavbarat/Documents/carepilot
+cd ./Documents/carepilot
 python3 -m venv venv
 source venv/bin/activate
 
