@@ -3,6 +3,7 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   MapPin, 
   Languages, 
@@ -33,6 +34,7 @@ export interface Provider {
   slots: Slot[];
   reasons: string[];
   estimatedCost: number;
+  image?: string;
 }
 
 interface ProviderCardProps {
@@ -42,10 +44,19 @@ interface ProviderCardProps {
 }
 
 export function ProviderCard({ provider, onSelectSlot, selectedSlotId }: ProviderCardProps) {
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
   return (
     <Card className="border-2 hover:shadow-lg transition-all">
       <CardHeader>
-        <div className="flex items-start justify-between">
+        <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
               <h3 className="text-xl font-bold text-gray-900">{provider.name}</h3>
@@ -76,6 +87,19 @@ export function ProviderCard({ provider, onSelectSlot, selectedSlotId }: Provide
                 </div>
               )}
             </div>
+          </div>
+          {/* Provider Image/Avatar */}
+          <div className="flex-shrink-0">
+            <Avatar className="h-20 w-20 border-2 border-gray-200">
+              <AvatarImage 
+                src={provider.image} 
+                alt={provider.name}
+                className="object-cover"
+              />
+              <AvatarFallback className="bg-blue-100 text-blue-700 text-lg font-semibold">
+                {getInitials(provider.name)}
+              </AvatarFallback>
+            </Avatar>
           </div>
         </div>
       </CardHeader>

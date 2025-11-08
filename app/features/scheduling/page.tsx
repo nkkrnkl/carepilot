@@ -31,6 +31,7 @@ const mockProviders: Provider[] = [
     telehealth: true,
     inNetwork: true,
     rating: 4.8,
+    image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=200&h=200&fit=crop&crop=face",
     slots: [
       { id: "1-1", date: "Tue, Nov 12", time: "9:30 AM", available: true, mode: "telehealth" as const },
       { id: "1-2", date: "Tue, Nov 12", time: "2:00 PM", available: true, mode: "in-person" as const },
@@ -56,6 +57,7 @@ const mockProviders: Provider[] = [
     telehealth: true,
     inNetwork: true,
     rating: 4.9,
+    image: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=200&h=200&fit=crop&crop=face",
     slots: [
       { id: "2-1", date: "Mon, Nov 11", time: "11:00 AM", available: true, mode: "telehealth" as const },
       { id: "2-2", date: "Tue, Nov 12", time: "3:30 PM", available: true, mode: "in-person" as const },
@@ -80,6 +82,7 @@ const mockProviders: Provider[] = [
     telehealth: false,
     inNetwork: true,
     rating: 4.7,
+    image: "https://images.unsplash.com/photo-1594824476968-48fd8d3c9b8b?w=200&h=200&fit=crop&crop=face",
     slots: [
       { id: "3-1", date: "Tue, Nov 12", time: "8:00 AM", available: true, mode: "in-person" as const },
       { id: "3-2", date: "Wed, Nov 13", time: "1:30 PM", available: true, mode: "in-person" as const },
