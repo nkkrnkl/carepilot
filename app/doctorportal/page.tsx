@@ -1,11 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { QuickActionModal } from "@/components/doctor/quick-action-modal";
 import { 
   Search, 
   Settings, 
@@ -26,7 +29,10 @@ import {
   TrendingDown,
   UserCheck,
   MessageSquare,
-  LogOut
+  LogOut,
+  Send,
+  User,
+  Plus
 } from "lucide-react";
 import { AreaChart, Area, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart } from "recharts";
 
@@ -70,6 +76,57 @@ const todayAppointments = [
 ];
 
 export default function DoctorsDashboard() {
+  const router = useRouter();
+  const [activeModal, setActiveModal] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    patientName: "",
+    patientId: "",
+    visitReason: "",
+    prescription: "",
+    message: "",
+    reportType: ""
+  });
+
+  const handleNewPatientVisit = () => {
+    setActiveModal("new-visit");
+  };
+
+  const handleReviewLabResults = () => {
+    router.push("/features/lab-analysis");
+  };
+
+  const handleWritePrescription = () => {
+    setActiveModal("prescription");
+  };
+
+  const handleSendMessage = () => {
+    setActiveModal("message");
+  };
+
+  const handleViewCharts = () => {
+    router.push("/exact");
+  };
+
+  const handleGenerateReport = () => {
+    setActiveModal("report");
+  };
+
+  const handleSubmit = (action: string) => {
+    // In a real app, this would submit to backend
+    console.log(`Submitting ${action}:`, formData);
+    alert(`${action} submitted successfully!`);
+    setActiveModal(null);
+    // Reset form
+    setFormData({
+      patientName: "",
+      patientId: "",
+      visitReason: "",
+      prescription: "",
+      message: "",
+      reportType: ""
+    });
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       {/* Header */}
@@ -358,33 +415,248 @@ export default function DoctorsDashboard() {
             <CardDescription>Common tasks</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button className="w-full justify-start" variant="outline">
+            <Button 
+              className="w-full justify-start" 
+              variant="outline"
+              onClick={handleNewPatientVisit}
+            >
               <Stethoscope className="h-4 w-4 mr-2" />
               New Patient Visit
             </Button>
-            <Button className="w-full justify-start" variant="outline">
+            <Button 
+              className="w-full justify-start" 
+              variant="outline"
+              onClick={handleReviewLabResults}
+            >
               <FileText className="h-4 w-4 mr-2" />
               Review Lab Results
             </Button>
-            <Button className="w-full justify-start" variant="outline">
+            <Button 
+              className="w-full justify-start" 
+              variant="outline"
+              onClick={handleWritePrescription}
+            >
               <Pill className="h-4 w-4 mr-2" />
               Write Prescription
             </Button>
-            <Button className="w-full justify-start" variant="outline">
+            <Button 
+              className="w-full justify-start" 
+              variant="outline"
+              onClick={handleSendMessage}
+            >
               <MessageSquare className="h-4 w-4 mr-2" />
               Send Patient Message
             </Button>
-            <Button className="w-full justify-start" variant="outline">
+            <Button 
+              className="w-full justify-start" 
+              variant="outline"
+              onClick={handleViewCharts}
+            >
               <ClipboardList className="h-4 w-4 mr-2" />
               View Charts
             </Button>
-            <Button className="w-full justify-start" variant="outline">
+            <Button 
+              className="w-full justify-start" 
+              variant="outline"
+              onClick={handleGenerateReport}
+            >
               <BarChart3 className="h-4 w-4 mr-2" />
               Generate Report
             </Button>
           </CardContent>
         </Card>
       </div>
+
+      {/* Modals */}
+      {/* New Patient Visit Modal */}
+      <QuickActionModal
+        isOpen={activeModal === "new-visit"}
+        onClose={() => setActiveModal(null)}
+        title="New Patient Visit"
+        description="Create a new patient visit record"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">
+              Patient Name
+            </label>
+            <Input
+              placeholder="Enter patient name"
+              value={formData.patientName}
+              onChange={(e) => setFormData({ ...formData, patientName: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">
+              Patient ID
+            </label>
+            <Input
+              placeholder="Enter patient ID"
+              value={formData.patientId}
+              onChange={(e) => setFormData({ ...formData, patientId: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">
+              Visit Reason
+            </label>
+            <Input
+              placeholder="Reason for visit"
+              value={formData.visitReason}
+              onChange={(e) => setFormData({ ...formData, visitReason: e.target.value })}
+            />
+          </div>
+          <div className="flex gap-3 pt-4">
+            <Button 
+              onClick={() => handleSubmit("New Patient Visit")}
+              className="flex-1"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create Visit
+            </Button>
+            <Button variant="outline" onClick={() => setActiveModal(null)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </QuickActionModal>
+
+      {/* Write Prescription Modal */}
+      <QuickActionModal
+        isOpen={activeModal === "prescription"}
+        onClose={() => setActiveModal(null)}
+        title="Write Prescription"
+        description="Create a new prescription for a patient"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">
+              Patient Name
+            </label>
+            <Input
+              placeholder="Enter patient name"
+              value={formData.patientName}
+              onChange={(e) => setFormData({ ...formData, patientName: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">
+              Prescription Details
+            </label>
+            <textarea
+              className="w-full min-h-[150px] rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+              placeholder="Enter prescription details, dosage, and instructions..."
+              value={formData.prescription}
+              onChange={(e) => setFormData({ ...formData, prescription: e.target.value })}
+            />
+          </div>
+          <div className="flex gap-3 pt-4">
+            <Button 
+              onClick={() => handleSubmit("Prescription")}
+              className="flex-1"
+            >
+              <Pill className="h-4 w-4 mr-2" />
+              Submit Prescription
+            </Button>
+            <Button variant="outline" onClick={() => setActiveModal(null)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </QuickActionModal>
+
+      {/* Send Patient Message Modal */}
+      <QuickActionModal
+        isOpen={activeModal === "message"}
+        onClose={() => setActiveModal(null)}
+        title="Send Patient Message"
+        description="Send a message to a patient"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">
+              Patient Name
+            </label>
+            <Input
+              placeholder="Enter patient name"
+              value={formData.patientName}
+              onChange={(e) => setFormData({ ...formData, patientName: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">
+              Message
+            </label>
+            <textarea
+              className="w-full min-h-[150px] rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+              placeholder="Enter your message..."
+              value={formData.message}
+              onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+            />
+          </div>
+          <div className="flex gap-3 pt-4">
+            <Button 
+              onClick={() => handleSubmit("Message")}
+              className="flex-1"
+            >
+              <Send className="h-4 w-4 mr-2" />
+              Send Message
+            </Button>
+            <Button variant="outline" onClick={() => setActiveModal(null)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </QuickActionModal>
+
+      {/* Generate Report Modal */}
+      <QuickActionModal
+        isOpen={activeModal === "report"}
+        onClose={() => setActiveModal(null)}
+        title="Generate Report"
+        description="Generate a practice report"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">
+              Report Type
+            </label>
+            <select
+              value={formData.reportType}
+              onChange={(e) => setFormData({ ...formData, reportType: e.target.value })}
+              className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+            >
+              <option value="">Select report type</option>
+              <option value="patient-visits">Patient Visits Report</option>
+              <option value="revenue">Revenue Report</option>
+              <option value="lab-results">Lab Results Summary</option>
+              <option value="prescriptions">Prescriptions Report</option>
+              <option value="monthly-summary">Monthly Summary</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">
+              Date Range
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <Input type="date" placeholder="Start date" />
+              <Input type="date" placeholder="End date" />
+            </div>
+          </div>
+          <div className="flex gap-3 pt-4">
+            <Button 
+              onClick={() => handleSubmit("Report")}
+              className="flex-1"
+            >
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Generate Report
+            </Button>
+            <Button variant="outline" onClick={() => setActiveModal(null)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </QuickActionModal>
     </div>
   );
 }
