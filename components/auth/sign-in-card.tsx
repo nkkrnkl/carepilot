@@ -55,17 +55,19 @@ export function SignInCard({
       className={`border-2 ${borderClass} transition-all cursor-pointer h-full flex flex-col`}
       onClick={onUserTypeSelect}
     >
-      <CardHeader className="text-center pb-4 flex-shrink-0 min-h-[200px] flex flex-col justify-center">
+      <CardHeader className="text-center pb-4 flex-shrink-0 h-[220px] flex flex-col justify-between">
         <div className={`mx-auto h-16 w-16 rounded-full ${color.bg} flex items-center justify-center mb-4`}>
           <Icon className={`h-8 w-8 ${color.text}`} />
         </div>
-        <CardTitle className="text-2xl mb-2">{title}</CardTitle>
-        <CardDescription className="text-base">{description}</CardDescription>
+        <div className="flex-1 flex flex-col justify-center">
+          <CardTitle className="text-2xl mb-3 h-[32px] flex items-center justify-center">{title}</CardTitle>
+          <CardDescription className="text-base min-h-[48px] flex items-center justify-center px-2">{description}</CardDescription>
+        </div>
       </CardHeader>
-      <CardContent className="flex-1 flex flex-col">
+      <CardContent className="flex-shrink-0">
         <div className="space-y-4">
           <div className="space-y-2">
-            <label htmlFor={`email-${userType}`} className="text-sm font-medium text-gray-700">
+            <label htmlFor={`email-${userType}`} className="text-sm font-medium text-gray-700 block h-5">
               Email
             </label>
             <div className="relative">
@@ -83,7 +85,7 @@ export function SignInCard({
             </div>
           </div>
           <div className="space-y-2">
-            <label htmlFor={`password-${userType}`} className="text-sm font-medium text-gray-700">
+            <label htmlFor={`password-${userType}`} className="text-sm font-medium text-gray-700 block h-5">
               Password
             </label>
             <div className="relative">
