@@ -20,7 +20,13 @@ import { FEATURES } from "@/lib/constants";
 const featureDetails = [
   {
     title: "Lab Analysis",
-    description: "Parse complex lab results with AI precision, extracting key metrics and flagging anomalies instantly. Identify trends across multiple tests over time, revealing patterns that might go unnoticed. Translate medical jargon into plain-English context that's easy to understand. Get actionable insights that help you understand your health metrics at a glance, with historical comparisons and expert-level interpretation. Track progress, set health goals, and receive personalized recommendations based on your unique test results.",
+    bullets: [
+      "Parse complex lab results with AI precision, extracting key metrics and flagging anomalies instantly",
+      "Identify trends across multiple tests over time, revealing patterns that might go unnoticed",
+      "Translate medical jargon into plain-English context that's easy to understand",
+      "Get actionable insights that help you understand your health metrics at a glance, with historical comparisons and expert-level interpretation",
+      "Track progress, set health goals, and receive personalized recommendations based on your unique test results"
+    ],
     icon: Beaker,
     link: "/features/lab-analysis",
     gradient: "from-blue-500 to-cyan-500",
@@ -34,7 +40,13 @@ const featureDetails = [
   },
   {
     title: "Scheduling",
-    description: "Navigate in-network providers effortlessly with a comprehensive database of healthcare professionals. Find available appointments that fit your schedule with real-time availability updates across multiple providers. Receive intelligent reminders for upcoming visits, prescription renewals, and follow-ups tailored to your preferences. Coordinate multiple appointments efficiently, avoiding scheduling conflicts. Never miss an important medical appointment again with automated calendar synchronization and smart notification systems.",
+    bullets: [
+      "Navigate in-network providers effortlessly with a comprehensive database of healthcare professionals",
+      "Find available appointments that fit your schedule with real-time availability updates across multiple providers",
+      "Receive intelligent reminders for upcoming visits, prescription renewals, and follow-ups tailored to your preferences",
+      "Coordinate multiple appointments efficiently, avoiding scheduling conflicts",
+      "Never miss an important medical appointment again with automated calendar synchronization and smart notification systems"
+    ],
     icon: Calendar,
     link: "/features/scheduling",
     gradient: "from-green-500 to-emerald-500",
@@ -48,7 +60,13 @@ const featureDetails = [
   },
   {
     title: "Bill Negotiation",
-    description: "Automatically detect billing discrepancies and overcharges by comparing your medical bills against industry standards and historical pricing data. Get the right price for medical services with data-driven negotiation support that provides evidence-based arguments. Review pre-drafted dispute letters and appeals before submission, customized to your specific situation. Track negotiation progress and outcomes, learning what works best for different types of charges. Save time and money on healthcare costs while ensuring you're not overpaying.",
+    bullets: [
+      "Automatically detect billing discrepancies and overcharges by comparing your medical bills against industry standards and historical pricing data",
+      "Get the right price for medical services with data-driven negotiation support that provides evidence-based arguments",
+      "Review pre-drafted dispute letters and appeals before submission, customized to your specific situation",
+      "Track negotiation progress and outcomes, learning what works best for different types of charges",
+      "Save time and money on healthcare costs while ensuring you're not overpaying"
+    ],
     icon: Receipt,
     link: "/features/bill-negotiation",
     gradient: "from-orange-500 to-amber-500",
@@ -62,7 +80,13 @@ const featureDetails = [
   },
   {
     title: "Claims",
-    description: "Pre-check claims for accuracy before submission to avoid rejections and delays. Verify that all required information is complete and correctly formatted according to your insurance provider's requirements. Ensure clean claims that get processed quickly on first submission, reducing administrative burden. Handle appeals efficiently with automated status tracking and deadline reminders. Stay informed about every step of your insurance claims process with real-time updates and detailed explanations of any issues that arise.",
+    bullets: [
+      "Pre-check claims for accuracy before submission to avoid rejections and delays",
+      "Verify that all required information is complete and correctly formatted according to your insurance provider's requirements",
+      "Ensure clean claims that get processed quickly on first submission, reducing administrative burden",
+      "Handle appeals efficiently with automated status tracking and deadline reminders",
+      "Stay informed about every step of your insurance claims process with real-time updates and detailed explanations of any issues that arise"
+    ],
     icon: FileText,
     link: "/features/claims",
     gradient: "from-indigo-500 to-blue-600",
@@ -112,7 +136,7 @@ export default function Overview() {
             </div>
             
             {/* Key Benefits */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 pt-6 border-t border-gray-200">
+            <div className="flex flex-col md:flex-row justify-center items-center gap-4 mt-6 pt-6 border-t border-gray-200">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-5 w-5 text-green-600" />
                 <span className="text-sm font-medium text-gray-700">Fully Auditable</span>
@@ -160,9 +184,14 @@ export default function Overview() {
                 </CardHeader>
                 
                 <CardContent className="relative">
-                  <CardDescription className="text-gray-700 leading-relaxed mb-6 text-base">
-                    {feature.description}
-                  </CardDescription>
+                  <ul className="text-gray-700 leading-relaxed mb-6 text-base space-y-2 list-none">
+                    {feature.bullets.map((bullet, bulletIndex) => (
+                      <li key={bulletIndex} className="flex items-start gap-3">
+                        <span className={`${feature.iconColor} mt-1.5 flex-shrink-0`}>•</span>
+                        <span>{bullet}</span>
+                      </li>
+                    ))}
+                  </ul>
                   
                   <Button 
                     asChild 
