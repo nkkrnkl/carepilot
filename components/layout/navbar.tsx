@@ -10,13 +10,13 @@ interface NavbarProps {
 
 export function Navbar({ showAuth = true, variant = "default", navLinks }: NavbarProps) {
   return (
-    <nav className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
+    <nav className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50 transition-all duration-300 hover:bg-white/95 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center gap-8">
-            <Link href="/" className="flex items-center gap-2">
-              <Sparkles className="h-6 w-6 text-blue-600" />
-              <span className="text-xl font-bold text-gray-900">CarePilot</span>
+            <Link href="/" className="flex items-center gap-2 group transition-transform duration-300 hover:scale-105">
+              <Sparkles className="h-6 w-6 text-blue-600 transition-transform duration-300 group-hover:rotate-12" />
+              <span className="text-xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">CarePilot</span>
             </Link>
             {navLinks && (
               <div className="hidden md:flex items-center gap-6">
