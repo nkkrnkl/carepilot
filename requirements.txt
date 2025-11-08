@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # CarePilot Python Dependencies
 # 
 # Install with: pip install -r requirements.txt
@@ -10,3 +11,7 @@ requests>=2.31.0,<3.0.0
 # Environment variable management
 # Used to load API keys and configuration from .env files
 python-dotenv>=1.0.0,<2.0.0
+=======
+requests
+python-dotenv
+>>>>>>> 1fc65639b79563eaf979c4349587ce53692ddd2d

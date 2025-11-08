@@ -1,3 +1,7 @@
+# CarePilot
+
+CarePilot is an AI-powered healthcare navigation system that helps streamline your healthcare experience.
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
