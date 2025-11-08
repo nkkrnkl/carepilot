@@ -81,15 +81,21 @@ export function HeroSection({
           </div>
         )}
         <h1 
-          className={`text-5xl lg:text-7xl font-bold text-gray-900 mb-6 leading-tight transition-all duration-1000 delay-200 ${
+          className={`mb-6 leading-tight transition-all duration-1000 delay-200 ${
             isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
           }`}
         >
-          <div className="block bg-gradient-to-r from-gray-900 via-blue-700 to-blue-600 bg-clip-text text-transparent animate-gradient">
-            {title.primary}
+          <div className="block text-6xl lg:text-8xl font-bold mb-4">
+            <span className="bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 bg-clip-text text-transparent animate-gradient animate-glow inline-block" style={{
+              textShadow: '0 0 40px rgba(59, 130, 246, 0.4), 0 0 80px rgba(59, 130, 246, 0.2)',
+              filter: 'drop-shadow(0 8px 16px rgba(59, 130, 246, 0.3))',
+              letterSpacing: '-0.02em',
+            }}>
+              {title.primary}
+            </span>
           </div>
           <div 
-            className={`block ${title.secondaryColor || "text-blue-600"} mt-2 text-3xl lg:text-4xl`}
+            className={`block ${title.secondaryColor || "text-blue-600"} mt-2 text-3xl lg:text-4xl font-semibold`}
             style={{
               animation: 'slideInUp 0.8s ease-out 0.4s both',
             }}
