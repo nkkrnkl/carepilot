@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "CarePilot - AI-Powered Healthcare Assistant",
-  description: "CarePilot is an AI agent that handles four high-leverage healthcare tasks: Lab Analysis, Scheduling, Bill Negotiation, and Claims Processing.",
+  description: "CarePilot is an AI agent that handles key healthcare tasks: Lab Analysis and Case Management for bills, EOBs, and claims.",
 };
 
 export default function RootLayout({

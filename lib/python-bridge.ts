@@ -5,6 +5,9 @@
 
 import { spawn } from "child_process";
 import { join } from "path";
+import { writeFileSync, readFileSync, unlinkSync, existsSync } from "fs";
+import { tmpdir } from "os";
+import { randomUUID } from "crypto";
 
 export interface PythonExecutionOptions {
   [key: string]: any;
@@ -28,21 +31,21 @@ export async function executePython(
   options: PythonExecutionOptions = {}
 ): Promise<PythonExecutionResult> {
   return new Promise((resolve) => {
-    try {
-      // Convert options to environment variables
-      const env = {
-        ...process.env,
-        ...Object.entries(options).reduce((acc, [key, value]) => {
-          acc[`PYTHON_${key.toUpperCase()}`] = String(value);
-          return acc;
-        }, {} as Record<string, string>),
-        // Also pass as JSON for complex objects
-        PYTHON_OPTIONS_JSON: JSON.stringify(options),
-      };
+    let inputFile: string | null = null;
+    let outputFile: string | null = null;
 
-      // Execute Python script
-      const pythonProcess = spawn("python3", [scriptPath], {
-        env,
+    try {
+      // Create temporary input and output files
+      const tempDir = tmpdir();
+      const uuid = randomUUID();
+      inputFile = join(tempDir, `python_input_${uuid}.json`);
+      outputFile = join(tempDir, `python_output_${uuid}.json`);
+
+      // Write input data to file
+      writeFileSync(inputFile, JSON.stringify(options, null, 2), 'utf-8');
+
+      // Execute Python script with file arguments
+      const pythonProcess = spawn("python3", [scriptPath, inputFile, outputFile], {
         cwd: process.cwd(),
       });
 
@@ -58,38 +61,159 @@ export async function executePython(
       });
 
       pythonProcess.on("close", (code) => {
+        // Clean up input file
+        if (inputFile) {
+          try {
+            unlinkSync(inputFile);
+          } catch (e) {
+            // Ignore cleanup errors
+          }
+        }
+
         if (code === 0) {
           try {
-            // Try to parse JSON output
-            const data = JSON.parse(stdout);
+            // Read output from file
+            if (outputFile) {
+              try {
+                const outputData = readFileSync(outputFile, 'utf-8');
+                const data = JSON.parse(outputData);
+                
+                // Clean up output file
+                try {
+                  unlinkSync(outputFile);
+                } catch (e) {
+                  // Ignore cleanup errors
+                }
+
+                resolve({
+                  success: true,
+                  output: stdout,
+                  data,
+                });
+                return;
+              } catch (fileError) {
+                console.warn("Failed to read output file, trying stdout:", fileError);
+                // Fall through to stdout parsing
+              }
+            }
+            
+            // Fallback: try to parse stdout
+            if (stdout.trim()) {
+              try {
+                const data = JSON.parse(stdout);
+                resolve({
+                  success: true,
+                  output: stdout,
+                  data,
+                });
+                return;
+              } catch (parseError) {
+                console.warn("Failed to parse stdout as JSON:", parseError);
+              }
+            }
+            
+            // If we get here, return success with stdout as output
             resolve({
               success: true,
               output: stdout,
-              data,
             });
-          } catch {
-            // If not JSON, return as plain text
+          } catch (parseError) {
+            console.error("Error processing Python output:", parseError);
             resolve({
-              success: true,
+              success: false,
+              error: `Failed to process Python script output: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
               output: stdout,
             });
           }
         } else {
+          // Process exited with non-zero code - it's an error
+          let errorData: any = null;
+          let errorMessage = stderr || `Process exited with code ${code}`;
+          
+          // Try to read error from output file
+          if (outputFile) {
+            try {
+              if (existsSync(outputFile)) {
+                const outputData = readFileSync(outputFile, 'utf-8');
+                errorData = JSON.parse(outputData);
+                
+                // If the output file contains error information, use it
+                if (errorData.error) {
+                  errorMessage = errorData.error;
+                }
+                if (errorData.error_type) {
+                  errorMessage = `[${errorData.error_type}] ${errorMessage}`;
+                }
+                
+                // Clean up output file
+                try {
+                  unlinkSync(outputFile);
+                } catch (e) {
+                  // Ignore cleanup errors
+                }
+              }
+            } catch (e) {
+              console.warn("Failed to read error from output file:", e);
+              // Continue with stderr/stdout error message
+            }
+          }
+
+          // Also check stdout for error messages
+          if (stdout.trim() && !errorData) {
+            try {
+              const stdoutData = JSON.parse(stdout);
+              if (stdoutData.error) {
+                errorMessage = stdoutData.error;
+                errorData = stdoutData;
+              }
+            } catch (e) {
+              // stdout is not JSON, use as-is if stderr is empty
+              if (!stderr) {
+                errorMessage = stdout.trim() || errorMessage;
+              }
+            }
+          }
+
           resolve({
             success: false,
-            error: stderr || `Process exited with code ${code}`,
+            error: errorMessage,
             output: stdout,
+            data: errorData,
           });
         }
       });
 
       pythonProcess.on("error", (error) => {
+        // Clean up files on error
+        if (inputFile) {
+          try {
+            unlinkSync(inputFile);
+          } catch (e) {}
+        }
+        if (outputFile) {
+          try {
+            unlinkSync(outputFile);
+          } catch (e) {}
+        }
+
         resolve({
           success: false,
           error: error.message || "Failed to execute Python script",
         });
       });
     } catch (error: any) {
+      // Clean up files on error
+      if (inputFile) {
+        try {
+          unlinkSync(inputFile);
+        } catch (e) {}
+      }
+      if (outputFile) {
+        try {
+          unlinkSync(outputFile);
+        } catch (e) {}
+      }
+
       resolve({
         success: false,
         error: error.message || "Unknown error executing Python script",

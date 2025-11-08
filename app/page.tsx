@@ -8,6 +8,7 @@ import { FeatureCard } from "@/components/feature-card";
 import { HeroSection } from "@/components/sections/hero-section";
 import { BenefitsSection } from "@/components/sections/benefits-section";
 import { CTASection } from "@/components/sections/cta-section";
+import { DocumentUploadSimple } from "@/components/documents/document-upload-simple";
 import { FEATURES, ROUTES } from "@/lib/constants";
 import { Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -146,7 +147,7 @@ export default function LandingPage() {
           secondary: "Your Personal Health Co-Pilot",
           secondaryColor: "text-blue-600",
         }}
-        description="Simplifies healthcare by handling what matters most—analyzing labs, booking appointments, negotiating bills, and managing claims—so you can focus on your health, not the paperwork."
+        description="CarePilot is an AI agent that handles key healthcare tasks to streamline your experience. From analyzing lab results to managing bills, EOBs, and claims—we automate the complex so you can focus on what matters."
         cta={{
           primary: {
             text: "Explore Features",
@@ -165,22 +166,32 @@ export default function LandingPage() {
         className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 relative z-10"
       >
         <div className="text-center mb-16">
-          <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4 bg-gradient-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent">
-            Four Powerful Features
-          </h2>
+          <h2 className="text-4xl font-bold text-gray-900 mb-4">Powerful Features</h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
             Everything you need to navigate healthcare with confidence
           </p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {FEATURES.map((feature, index) => (
-            <FeatureCard 
-              key={feature.id} 
-              feature={feature} 
-              index={index}
-            />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+          {FEATURES.map((feature) => (
+            <FeatureCard key={feature.id} feature={feature} />
           ))}
         </div>
+      </section>
+
+      {/* Document Upload Section */}
+      <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">Upload Your Documents</h2>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Upload PDF documents to be processed, chunked, and stored in our vector database for intelligent retrieval
+          </p>
+        </div>
+        <DocumentUploadSimple 
+          userId="user-123"
+          onUploadComplete={(file) => {
+            console.log("Upload complete:", file);
+          }}
+        />
       </section>
 
       <BenefitsSection />
