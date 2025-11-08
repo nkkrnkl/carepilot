@@ -64,6 +64,7 @@ export const BENEFITS = [
 export const ROUTES = {
   LANDING: "/",
   SIGNIN: "/signin",
+  SIGNUP: "/signup",
   PATIENT: "/patient",
   DOCTOR: "/doctorportal",
   OVERVIEW: "/overview",

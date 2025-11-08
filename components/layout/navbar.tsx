@@ -39,8 +39,11 @@ export function Navbar({ showAuth = true, variant = "default", navLinks }: Navba
                   <Button asChild variant="ghost">
                     <Link href="/overview">Overview</Link>
                   </Button>
-                  <Button asChild>
+                  <Button asChild variant="ghost">
                     <Link href="/signin">Sign In</Link>
+                  </Button>
+                  <Button asChild>
+                    <Link href="/signup">Sign Up</Link>
                   </Button>
                 </>
               )}

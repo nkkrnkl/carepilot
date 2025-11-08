@@ -3,19 +3,21 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { SignInCard } from "@/components/auth/sign-in-card";
+import { SignUpCard } from "@/components/auth/sign-up-card";
 import { USER_TYPES, SIGN_IN_CONFIG, ROUTES } from "@/lib/constants";
 import type { UserType } from "@/lib/constants";
 
-export default function SignInPage() {
+export default function SignUpPage() {
   const router = useRouter();
   const [userType, setUserType] = useState<UserType | null>(null);
+  const [patientName, setPatientName] = useState("");
   const [patientEmail, setPatientEmail] = useState("");
-  const [patientPassword, setPatientPassword] = useState("");
+  const [doctorName, setDoctorName] = useState("");
   const [doctorEmail, setDoctorEmail] = useState("");
-  const [doctorPassword, setDoctorPassword] = useState("");
 
-  const handleSignIn = (type: UserType) => {
+  const handleSignUp = (type: UserType) => {
+    // TODO: Add actual sign-up logic (API call, validation, etc.)
+    // For now, just navigate to the respective dashboard
     if (type === USER_TYPES.DOCTOR) {
       router.push("/doctorportal");
     } else if (type === USER_TYPES.PATIENT) {
@@ -30,44 +32,44 @@ export default function SignInPage() {
           <Link href="/" className="inline-block mb-4">
             <h1 className="text-3xl font-bold text-gray-900">CarePilot</h1>
           </Link>
-          <p className="text-gray-600">Sign in to access your dashboard</p>
+          <p className="text-gray-600">Create an account to get started</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-          <SignInCard
+          <SignUpCard
             userType={USER_TYPES.PATIENT}
             icon={SIGN_IN_CONFIG.patient.icon}
             title={SIGN_IN_CONFIG.patient.title}
             description={SIGN_IN_CONFIG.patient.description}
             color={SIGN_IN_CONFIG.patient.color}
+            name={patientName}
             email={patientEmail}
-            password={patientPassword}
+            onNameChange={setPatientName}
             onEmailChange={setPatientEmail}
-            onPasswordChange={setPatientPassword}
             onUserTypeSelect={() => setUserType(USER_TYPES.PATIENT)}
-            onSignIn={() => handleSignIn(USER_TYPES.PATIENT)}
+            onSignUp={() => handleSignUp(USER_TYPES.PATIENT)}
           />
 
-          <SignInCard
+          <SignUpCard
             userType={USER_TYPES.DOCTOR}
             icon={SIGN_IN_CONFIG.doctor.icon}
             title={SIGN_IN_CONFIG.doctor.title}
             description={SIGN_IN_CONFIG.doctor.description}
             color={SIGN_IN_CONFIG.doctor.color}
+            name={doctorName}
             email={doctorEmail}
-            password={doctorPassword}
+            onNameChange={setDoctorName}
             onEmailChange={setDoctorEmail}
-            onPasswordChange={setDoctorPassword}
             onUserTypeSelect={() => setUserType(USER_TYPES.DOCTOR)}
-            onSignIn={() => handleSignIn(USER_TYPES.DOCTOR)}
+            onSignUp={() => handleSignUp(USER_TYPES.DOCTOR)}
           />
         </div>
 
         <div className="text-center mt-6 space-y-2">
           <p className="text-sm text-gray-600">
-            Don't have an account?{" "}
-            <Link href="/signup" className="text-blue-600 hover:text-blue-800 font-medium">
-              Sign Up
+            Already have an account?{" "}
+            <Link href="/signin" className="text-blue-600 hover:text-blue-800 font-medium">
+              Sign In
             </Link>
           </p>
           <Link href="/" className="text-sm text-gray-600 hover:text-gray-900 block">
@@ -78,3 +80,4 @@ export default function SignInPage() {
     </div>
   );
 }
+
