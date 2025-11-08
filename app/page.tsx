@@ -20,6 +20,7 @@ export default function LandingPage() {
   const [scrollY, setScrollY] = useState(0);
   const featuresRef = useRef<HTMLDivElement>(null);
   const [checkingRole, setCheckingRole] = useState(false);
+  const hasCheckedRole = useRef(false);
 
   // Check if user is logged in and redirect to appropriate dashboard
   useEffect(() => {
@@ -27,12 +28,28 @@ export default function LandingPage() {
       // Don't redirect while Auth0 is loading
       if (isLoading) return;
       
+      // Prevent multiple simultaneous checks
+      if (hasCheckedRole.current) return;
+      
       // Only redirect if user is logged in
-      if (user && user.email && !checkingRole) {
+      if (user && user.email) {
+        hasCheckedRole.current = true;
         setCheckingRole(true);
         try {
           // Check if user has a role set in database
           const response = await fetch(`/api/users/role`);
+          
+          // Handle non-OK responses
+          if (!response.ok) {
+            // If unauthorized, user is not logged in or session expired
+            if (response.status === 401) {
+              setCheckingRole(false);
+              hasCheckedRole.current = false; // Allow retry if session becomes valid
+              return; // Stay on landing page
+            }
+            throw new Error(`API error: ${response.status}`);
+          }
+          
           const data = await response.json();
           
           if (data.success && data.role) {
@@ -43,6 +60,14 @@ export default function LandingPage() {
           
           // Check if user exists in database with role
           const userResponse = await fetch(`/api/users?emailAddress=${encodeURIComponent(user.email)}`);
+          
+          if (!userResponse.ok) {
+            // If error, just show landing page
+            setCheckingRole(false);
+            hasCheckedRole.current = false; // Allow retry
+            return;
+          }
+          
           const userData = await userResponse.json();
           
           if (userData.success && userData.user?.userRole) {
@@ -56,14 +81,19 @@ export default function LandingPage() {
           window.location.href = "/signin";
         } catch (error) {
           console.error("Error checking user role:", error);
-          // On error, redirect to sign-in page
-          window.location.href = "/signin";
+          // On error, don't redirect - just show landing page
+          setCheckingRole(false);
+          hasCheckedRole.current = false; // Allow retry on error
         }
+      } else {
+        // User is not logged in, stay on landing page
+        setCheckingRole(false);
+        hasCheckedRole.current = false; // Reset when user logs out
       }
     }
     
     checkUserAndRedirect();
-  }, [user, isLoading, checkingRole]);
+  }, [user, isLoading]);
 
   useEffect(() => {
     const handleScroll = () => {

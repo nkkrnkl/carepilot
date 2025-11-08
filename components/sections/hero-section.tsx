@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface HeroSectionProps {
   badge?: {
@@ -36,9 +36,14 @@ export function HeroSection({
 }: HeroSectionProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const hasMounted = useRef(false);
 
   useEffect(() => {
-    setIsVisible(true);
+    // Only set visible once on mount to prevent infinite loops
+    if (!hasMounted.current) {
+      hasMounted.current = true;
+      setIsVisible(true);
+    }
   }, []);
 
   useEffect(() => {

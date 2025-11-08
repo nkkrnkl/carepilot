@@ -82,8 +82,6 @@ async function migrateDoctors() {
           slots: doctor.slots || [],
           reasons: doctor.reasons || [],
           estimatedCost: doctor.estimatedCost,
-          createdAt: doctor.createdAt,
-          updatedAt: doctor.updatedAt,
         });
 
         console.log(`   ✅ Migrated doctor ${doctor.id} (${doctor.name})`);

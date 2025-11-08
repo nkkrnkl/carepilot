@@ -4,15 +4,26 @@
  * GET /api/users/role - Get user role
  */
 
-import { NextResponse } from "next/server";
-import { getSession } from "@auth0/nextjs-auth0";
+import { NextRequest, NextResponse } from "next/server";
+import { auth0 } from "@/lib/auth0";
 import { getUserByEmail, updateUser, createUser } from "@/lib/azure/sql-storage";
 
 export const dynamic = 'force-dynamic';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
+    // Get session with request context for route handlers
+    let session;
+    try {
+      session = await auth0.getSession(request);
+    } catch (authError: any) {
+      console.error("Auth0 session error:", authError);
+      return NextResponse.json(
+        { success: false, error: "Authentication error", details: authError.message },
+        { status: 401 }
+      );
+    }
+    
     if (!session?.user?.email) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
@@ -73,9 +84,20 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    const session = await getSession();
+    // Get session with request context for route handlers
+    let session;
+    try {
+      session = await auth0.getSession(request);
+    } catch (authError: any) {
+      console.error("Auth0 session error:", authError);
+      return NextResponse.json(
+        { success: false, error: "Authentication error", details: authError.message },
+        { status: 401 }
+      );
+    }
+    
     if (!session?.user?.email) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
