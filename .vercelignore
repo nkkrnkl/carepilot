@@ -1,0 +1,35 @@
+# Vercel ignore file
+# Files/directories to exclude from deployment
+
+# Python backend (deploy separately)
+backend/
+venv/
+*.py
+requirements.txt
+
+# Development files
+.git/
+.vscode/
+.idea/
+
+# Local database files
+*.db
+*.db-journal
+prisma/dev.db
+
+# Test files
+**/__tests__/
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+
+# Documentation (optional - can include if needed)
+# *.md
+
+# Uploads (should use cloud storage in production)
+uploads/
+
+# Environment files (handled by Vercel)
+.env.local
+.env*.local
+
