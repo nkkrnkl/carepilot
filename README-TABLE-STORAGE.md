@@ -4,7 +4,7 @@ This document explains how to set up and use Azure Table Storage for CarePilot's
 
 ## Tables
 
-CarePilot uses 4 Azure Table Storage tables:
+CarePilot uses 3 Azure Table Storage tables:
 
 ### 1. **insurer** table
 - `unique_id` (RowKey) - Unique identifier for the insurer
@@ -43,16 +43,12 @@ CarePilot uses 4 Azure Table Storage tables:
   - `insuranceState` (optional)
   - `insuranceZipCode` (optional)
   - `insurancePhone` (optional)
+- **Documents:**
+  - `documents` (optional) - JSON string containing an array of Document objects
+  - Each Document has: `doc_type`, `doc_name`, `doc_url`, `doc_size`, `uploaded_at`
 - `partitionKey` - Always "user"
 
-### 4. **document** table
-- `document_id` (RowKey) - Unique document ID
-- `user_id` (PartitionKey) - Links to user
-- `doc_type` - Type of document
-- `doc_name` - Name of the document
-- `doc_url` (optional) - URL to the document
-- `doc_size` (optional) - Size of the document
-- `uploaded_at` (optional) - Upload timestamp
+**Note:** Documents are stored as a JSON field in the user table, not in a separate table. This simplifies data management and reduces table operations.
 
 ## Setup Instructions
 
@@ -113,10 +109,9 @@ import {
   createUser,
   getUserByEmail,
   updateUser,
-  createDocument,
-  getUserDocuments,
   createInsurer,
   createProvider,
+  type Document,
 } from "@/lib/azure/table-storage";
 ```
 
@@ -155,21 +150,33 @@ await updateUser("john.doe@example.com", {
 });
 ```
 
-### Create a Document
+### Add Documents to a User
+
+Documents are stored as a JSON string in the user table:
 
 ```typescript
-await createDocument({
-  user_id: "john.doe@example.com",
+const user = await getUserByEmail("john.doe@example.com");
+const documents: Document[] = user?.documents ? JSON.parse(user.documents) : [];
+
+// Add a new document
+documents.push({
   doc_type: "insurance_card",
   doc_name: "insurance_card_front.jpg",
   doc_url: "https://storage...",
+  uploaded_at: new Date().toISOString(),
+});
+
+// Update user with documents
+await updateUser("john.doe@example.com", {
+  documents: JSON.stringify(documents),
 });
 ```
 
 ### Get User Documents
 
 ```typescript
-const documents = await getUserDocuments("john.doe@example.com");
+const user = await getUserByEmail("john.doe@example.com");
+const documents: Document[] = user?.documents ? JSON.parse(user.documents) : [];
 ```
 
 ## API Routes

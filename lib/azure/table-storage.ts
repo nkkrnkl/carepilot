@@ -1,6 +1,7 @@
 /**
  * Azure Table Storage client for CarePilot
- * Handles user data, insurer data, provider data, and documents
+ * Handles user data, insurer data, and provider data
+ * Documents are stored as JSON in the user table
  */
 
 import { TableClient, AzureNamedKeyCredential } from "@azure/data-tables";
@@ -14,7 +15,6 @@ export const TABLE_NAMES = {
   INSURER: "insurer",
   PROVIDER: "provider",
   USER: "user",
-  DOCUMENT: "document",
 } as const;
 
 /**
@@ -61,7 +61,6 @@ export async function createAllTables(): Promise<void> {
   await createTableIfNotExists(TABLE_NAMES.INSURER);
   await createTableIfNotExists(TABLE_NAMES.PROVIDER);
   await createTableIfNotExists(TABLE_NAMES.USER);
-  await createTableIfNotExists(TABLE_NAMES.DOCUMENT);
   console.log("✅ All tables created successfully");
 }
 
@@ -164,6 +163,15 @@ export async function listProviders(): Promise<ProviderEntity[]> {
 export type PreferredLanguage = "English" | "Spanish" | "Chinese" | "French" | "Arabic";
 export type PlanType = "HMO" | "PPO" | "EPO" | "POS" | "HDHP" | "Other";
 
+// Document interface (stored as JSON in user table)
+export interface Document {
+  doc_type: string;
+  doc_name: string;
+  doc_url?: string;
+  doc_size?: number;
+  uploaded_at?: string;
+}
+
 export interface UserEntity {
   partitionKey: string; // "user"
   rowKey: string; // user_id (usually email or generated ID)
@@ -193,6 +201,8 @@ export interface UserEntity {
   insuranceState?: string;
   insuranceZipCode?: string;
   insurancePhone?: string;
+  // Documents (stored as JSON string)
+  documents?: string; // JSON string of Document[]
   timestamp?: Date;
 }
 
@@ -244,60 +254,8 @@ export async function listUsers(): Promise<UserEntity[]> {
 }
 
 // ============================================================================
-// DOCUMENT TABLE
+// DOCUMENT TABLE - REMOVED
+// Documents are now stored in the user table as a JSON field (documents)
+// Use the Document interface and store documents as JSON.parse/stringify
 // ============================================================================
-
-export interface DocumentEntity {
-  partitionKey: string; // user_id
-  rowKey: string; // document_id (unique)
-  user_id: string;
-  doc_type: string;
-  doc_name: string;
-  doc_url?: string;
-  doc_size?: number;
-  uploaded_at?: string;
-  timestamp?: Date;
-}
-
-export async function createDocument(document: Omit<DocumentEntity, "partitionKey" | "rowKey" | "timestamp">): Promise<void> {
-  const tableClient = getTableClient(TABLE_NAMES.DOCUMENT);
-  // Generate unique document ID
-  const documentId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-  const entity: DocumentEntity = {
-    partitionKey: document.user_id,
-    rowKey: documentId,
-    ...document,
-  };
-  await tableClient.createEntity(entity);
-}
-
-export async function getDocument(userId: string, documentId: string): Promise<DocumentEntity | null> {
-  try {
-    const tableClient = getTableClient(TABLE_NAMES.DOCUMENT);
-    const entity = await tableClient.getEntity<DocumentEntity>(userId, documentId);
-    return entity;
-  } catch (error: any) {
-    if (error.statusCode === 404) {
-      return null;
-    }
-    throw error;
-  }
-}
-
-export async function getUserDocuments(userId: string): Promise<DocumentEntity[]> {
-  const tableClient = getTableClient(TABLE_NAMES.DOCUMENT);
-  const entities: DocumentEntity[] = [];
-  const queryOptions = {
-    queryOptions: { filter: `PartitionKey eq '${userId}'` }
-  };
-  for await (const entity of tableClient.listEntities<DocumentEntity>(queryOptions)) {
-    entities.push(entity);
-  }
-  return entities;
-}
-
-export async function deleteDocument(userId: string, documentId: string): Promise<void> {
-  const tableClient = getTableClient(TABLE_NAMES.DOCUMENT);
-  await tableClient.deleteEntity(userId, documentId);
-}
 

@@ -9,11 +9,11 @@ import {
   createAllTables,
   createUser,
   getUserByEmail,
-  createDocument,
-  getUserDocuments,
   createInsurer,
   createProvider,
   listUsers,
+  updateUser,
+  type Document,
 } from "../lib/azure/table-storage";
 
 async function testTableStorage() {
@@ -74,24 +74,34 @@ async function testTableStorage() {
     }
     console.log();
 
-    // 6. Create a test document
-    console.log("6. Creating test document...");
-    await createDocument({
-      user_id: testEmail,
-      doc_type: "insurance_card",
-      doc_name: "insurance_card_front.jpg",
-      doc_url: "https://example.com/doc.jpg",
-    });
-    console.log("✅ Document created\n");
+    // 6. Add a test document to user
+    console.log("6. Adding test document to user...");
+    const userWithDoc = await getUserByEmail(testEmail);
+    if (userWithDoc) {
+      const documents: Document[] = userWithDoc.documents ? JSON.parse(userWithDoc.documents) : [];
+      documents.push({
+        doc_type: "insurance_card",
+        doc_name: "insurance_card_front.jpg",
+        doc_url: "https://example.com/doc.jpg",
+        uploaded_at: new Date().toISOString(),
+      });
+      await updateUser(testEmail, {
+        documents: JSON.stringify(documents),
+      });
+      console.log("✅ Document added to user\n");
 
-    // 7. Retrieve user documents
-    console.log("7. Retrieving user documents...");
-    const documents = await getUserDocuments(testEmail);
-    console.log(`✅ Found ${documents.length} document(s)`);
-    documents.forEach((doc) => {
-      console.log(`   - ${doc.doc_name} (${doc.doc_type})`);
-    });
-    console.log();
+      // 7. Retrieve user documents
+      console.log("7. Retrieving user documents...");
+      const updatedUser = await getUserByEmail(testEmail);
+      if (updatedUser && updatedUser.documents) {
+        const userDocuments: Document[] = JSON.parse(updatedUser.documents);
+        console.log(`✅ Found ${userDocuments.length} document(s)`);
+        userDocuments.forEach((doc) => {
+          console.log(`   - ${doc.doc_name} (${doc.doc_type})`);
+        });
+      }
+      console.log();
+    }
 
     // 8. List all users
     console.log("8. Listing all users...");

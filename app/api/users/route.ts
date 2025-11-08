@@ -12,17 +12,17 @@ import {
   updateUser,
   listUsers,
   type UserEntity,
-} from "@/lib/azure/table-storage";
+} from "@/lib/azure/sql-storage";
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const email = searchParams.get("email");
+    const emailAddress = searchParams.get("emailAddress") || searchParams.get("email");
 
-    if (email) {
-      const user = await getUserByEmail(email);
+    if (emailAddress) {
+      const user = await getUserByEmail(emailAddress);
       if (!user) {
         return NextResponse.json(
           { success: false, error: "User not found" },
@@ -49,18 +49,14 @@ export async function POST(request: Request) {
     
     // Validate required fields
     const requiredFields = [
-      "firstName",
-      "lastName",
-      "dateOfBirth",
-      "email",
-      "phoneNumber",
-      "address",
-      "city",
-      "state",
-      "zipCode",
-      "insuranceCompany",
-      "accountNumber",
-      "planType",
+      "FirstName",
+      "LastName",
+      "DateOfBirth",
+      "emailAddress",
+      "StreetAddress",
+      "PatientCity",
+      "PatientState",
+      "InsurancePlanType",
     ];
 
     for (const field of requiredFields) {
@@ -72,7 +68,7 @@ export async function POST(request: Request) {
       }
     }
 
-    await createUser(userData as Omit<UserEntity, "partitionKey" | "rowKey" | "timestamp">);
+    await createUser(userData as UserEntity);
     return NextResponse.json({ success: true, message: "User created successfully" });
   } catch (error: any) {
     console.error("Error creating user:", error);
@@ -93,16 +89,16 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    const { email, ...updates } = await request.json();
+    const { emailAddress, ...updates } = await request.json();
 
-    if (!email) {
+    if (!emailAddress) {
       return NextResponse.json(
-        { success: false, error: "Email is required" },
+        { success: false, error: "emailAddress is required" },
         { status: 400 }
       );
     }
 
-    await updateUser(email, updates);
+    await updateUser(emailAddress, updates);
     return NextResponse.json({ success: true, message: "User updated successfully" });
   } catch (error: any) {
     console.error("Error updating user:", error);

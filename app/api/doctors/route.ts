@@ -1,12 +1,36 @@
 /**
- * API Route to fetch doctors data from Azure Blob Storage
+ * API Route to fetch doctors data from Azure SQL Database
  * GET /api/doctors
  */
 
 import { NextResponse } from "next/server";
-import { downloadDoctorsData } from "@/lib/azure/blob-storage";
+import { listDoctors, type DoctorEntity, type DoctorSlot } from "@/lib/azure/sql-storage";
 
 export const dynamic = 'force-dynamic';
+
+/**
+ * Convert SQL doctor entity to API response format
+ */
+function formatDoctorForApi(doctor: DoctorEntity) {
+  return {
+    id: doctor.id,
+    name: doctor.name,
+    specialty: doctor.specialty,
+    address: doctor.address,
+    distance: doctor.distance,
+    travelTime: doctor.travelTime,
+    languages: doctor.languages ? JSON.parse(doctor.languages) : [],
+    telehealth: doctor.telehealth,
+    inNetwork: doctor.inNetwork,
+    rating: doctor.rating,
+    image: doctor.image,
+    slots: doctor.slots ? JSON.parse(doctor.slots) as DoctorSlot[] : [],
+    reasons: doctor.reasons ? JSON.parse(doctor.reasons) : [],
+    estimatedCost: doctor.estimatedCost,
+    createdAt: doctor.createdAt,
+    updatedAt: doctor.updatedAt,
+  };
+}
 
 export async function GET(request: Request) {
   try {
@@ -14,58 +38,66 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search');
     const specialty = searchParams.get('specialty');
-    const zipCode = searchParams.get('zipCode');
     const telehealth = searchParams.get('telehealth');
     const language = searchParams.get('language');
+    const inNetwork = searchParams.get('inNetwork');
     
-    // Download doctors data from Azure Blob Storage
-    let doctors = await downloadDoctorsData();
+    // Build filters
+    const filters: {
+      search?: string;
+      specialty?: string;
+      telehealth?: boolean;
+      language?: string;
+      inNetwork?: boolean;
+    } = {};
+
+    if (search) {
+      filters.search = search;
+    }
+
+    if (specialty) {
+      filters.specialty = specialty;
+    }
+
+    if (telehealth === 'true') {
+      filters.telehealth = true;
+    }
+
+    if (language) {
+      filters.language = language;
+    }
+
+    if (inNetwork === 'true') {
+      filters.inNetwork = true;
+    }
     
-    // If no doctors found in blob storage, return empty array with error info
-    if (doctors.length === 0) {
-      console.warn("No doctors found in Azure Blob Storage");
-      return NextResponse.json({
-        success: false,
-        count: 0,
-        data: [],
-        error: "No doctors data found in Azure Blob Storage"
+    // Fetch doctors from SQL Database
+    let doctors = await listDoctors(filters);
+    
+    // Apply additional language filtering in application layer
+    // (since JSON parsing in SQL is complex)
+    if (language && !filters.language) {
+      doctors = doctors.filter((doctor) => {
+        try {
+          const languages: string[] = doctor.languages ? JSON.parse(doctor.languages) : [];
+          return languages.some((lang: string) => 
+            lang.toLowerCase().includes(language.toLowerCase())
+          );
+        } catch {
+          return false;
+        }
       });
     }
     
-    // Apply filters
-    if (search) {
-      const searchLower = search.toLowerCase();
-      doctors = doctors.filter((doctor: any) => 
-        doctor.name.toLowerCase().includes(searchLower) ||
-        doctor.specialty.toLowerCase().includes(searchLower) ||
-        doctor.address.toLowerCase().includes(searchLower)
-      );
-    }
-    
-    if (specialty) {
-      doctors = doctors.filter((doctor: any) => 
-        doctor.specialty.toLowerCase().includes(specialty.toLowerCase())
-      );
-    }
-    
-    if (telehealth === 'true') {
-      doctors = doctors.filter((doctor: any) => doctor.telehealth === true);
-    }
-    
-    if (language) {
-      doctors = doctors.filter((doctor: any) => 
-        doctor.languages.some((lang: string) => 
-          lang.toLowerCase().includes(language.toLowerCase())
-        )
-      );
-    }
+    // Format doctors for API response
+    const formattedDoctors = doctors.map(formatDoctorForApi);
     
     // Return doctors data
     return NextResponse.json({
       success: true,
-      count: doctors.length,
-      data: doctors,
-      source: "azure-blob-storage"
+      count: formattedDoctors.length,
+      data: formattedDoctors,
+      source: "azure-sql-database"
     });
     
   } catch (error: any) {

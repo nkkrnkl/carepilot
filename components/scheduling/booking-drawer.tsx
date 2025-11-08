@@ -10,7 +10,9 @@ import {
   Video, 
   CheckCircle2,
   Download,
-  X
+  X,
+  Loader2,
+  AlertCircle
 } from "lucide-react";
 
 interface BookingDrawerProps {
@@ -28,9 +30,11 @@ interface BookingDrawerProps {
     estimatedCost: number;
   };
   onConfirm: () => void;
+  isBooking?: boolean;
+  error?: string | null;
 }
 
-export function BookingDrawer({ isOpen, onClose, provider, onConfirm }: BookingDrawerProps) {
+export function BookingDrawer({ isOpen, onClose, provider, onConfirm, isBooking = false, error }: BookingDrawerProps) {
   if (!isOpen) return null;
 
   return (
@@ -119,16 +123,51 @@ export function BookingDrawer({ isOpen, onClose, provider, onConfirm }: BookingD
             </CardContent>
           </Card>
 
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-red-900 mb-1">Booking Error</p>
+                  <p className="text-sm text-red-800">{error}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Actions */}
           <div className="space-y-3">
-            <Button onClick={onConfirm} className="w-full" size="lg">
-              Confirm Appointment
+            <Button 
+              onClick={onConfirm} 
+              className="w-full" 
+              size="lg"
+              disabled={isBooking}
+            >
+              {isBooking ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Booking...
+                </>
+              ) : (
+                "Confirm Appointment"
+              )}
             </Button>
-            <Button variant="outline" className="w-full" size="lg">
+            <Button 
+              variant="outline" 
+              className="w-full" 
+              size="lg"
+              disabled={isBooking}
+            >
               <Download className="h-4 w-4 mr-2" />
               Add to Calendar
             </Button>
-            <Button variant="ghost" onClick={onClose} className="w-full">
+            <Button 
+              variant="ghost" 
+              onClick={onClose} 
+              className="w-full"
+              disabled={isBooking}
+            >
               Cancel
             </Button>
           </div>

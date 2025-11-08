@@ -1,6 +1,9 @@
+"use client";
+
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Sparkles } from "lucide-react";
+import { Sparkles, LogIn, LogOut, User } from "lucide-react";
+import { useUser } from '@auth0/nextjs-auth0/client';
 
 interface NavbarProps {
   showAuth?: boolean;
@@ -9,6 +12,8 @@ interface NavbarProps {
 }
 
 export function Navbar({ showAuth = true, variant = "default", navLinks }: NavbarProps) {
+  const { user, isLoading } = useUser();
+
   return (
     <nav className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50 transition-all duration-300 hover:bg-white/95 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -39,12 +44,36 @@ export function Navbar({ showAuth = true, variant = "default", navLinks }: Navba
                   <Button asChild variant="ghost">
                     <Link href="/overview">Overview</Link>
                   </Button>
-                  <Button asChild variant="ghost">
-                    <Link href="/signin">Sign In</Link>
-                  </Button>
-                  <Button asChild>
-                    <Link href="/signup">Sign Up</Link>
-                  </Button>
+                  {!isLoading && (
+                    user ? (
+                      <>
+                        <Button asChild variant="outline">
+                          <Link href="/profile" className="flex items-center gap-2">
+                            <User className="h-4 w-4" />
+                            {user.name || user.email}
+                          </Link>
+                        </Button>
+                        <Button asChild variant="ghost">
+                          <a href="/auth/logout" className="flex items-center gap-2">
+                            <LogOut className="h-4 w-4" />
+                            Logout
+                          </a>
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button asChild variant="ghost">
+                          <Link href="/signin" className="flex items-center gap-2">
+                            <LogIn className="h-4 w-4" />
+                            Sign In
+                          </Link>
+                        </Button>
+                        <Button asChild>
+                          <Link href="/signup">Sign Up</Link>
+                        </Button>
+                      </>
+                    )
+                  )}
                 </>
               )}
             </div>

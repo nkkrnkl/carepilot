@@ -4,6 +4,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useUser } from '@auth0/nextjs-auth0/client';
+import { useDashboardUrl } from '@/lib/navigation';
 import { 
   Receipt,
   FileSearch,
@@ -50,6 +52,9 @@ const capabilities = [
 ];
 
 export default function BillNegotiationPage() {
+  const { user } = useUser();
+  const dashboardUrl = useDashboardUrl();
+  
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       {/* Navigation */}
@@ -58,7 +63,7 @@ export default function BillNegotiationPage() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-4">
               <Button asChild variant="ghost" size="sm">
-                <Link href="/" className="flex items-center gap-2">
+                <Link href={dashboardUrl} className="flex items-center gap-2">
                   <ArrowLeft className="h-4 w-4" />
                   Back
                 </Link>
@@ -69,7 +74,7 @@ export default function BillNegotiationPage() {
               </div>
             </div>
             <Button asChild variant="outline">
-              <Link href="/">Home</Link>
+              <Link href={dashboardUrl}>Dashboard</Link>
             </Button>
           </div>
         </div>

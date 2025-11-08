@@ -15,6 +15,8 @@ import {
   Video,
   Loader2
 } from "lucide-react";
+import { useUser } from '@auth0/nextjs-auth0/client';
+import { useDashboardUrl } from '@/lib/navigation';
 import { ProviderCard, Provider, Slot } from "@/components/scheduling/provider-card";
 import { SearchFilters, FilterState } from "@/components/scheduling/search-filters";
 import { BookingDrawer } from "@/components/scheduling/booking-drawer";
@@ -100,6 +102,8 @@ const mockProviders: Provider[] = [
 ];
 
 export default function SchedulingPage() {
+  const { user, isLoading: authLoading } = useUser();
+  const dashboardUrl = useDashboardUrl();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -174,17 +178,91 @@ export default function SchedulingPage() {
     }
   };
 
+  const [isBooking, setIsBooking] = useState(false);
+  const [bookingError, setBookingError] = useState<string | null>(null);
+
   const handleSelectSlot = (providerId: string, slotId: string) => {
     setSelectedProvider(providerId);
     setSelectedSlot(slotId);
     setIsBookingOpen(true);
+    setBookingError(null);
   };
 
-  const handleConfirmBooking = () => {
-    setIsConfirmed(true);
-    setIsBookingOpen(false);
-    // In a real app, this would call the booking API
-    setTimeout(() => setIsConfirmed(false), 5000);
+  const handleConfirmBooking = async () => {
+    if (!selectedProviderData || !selectedSlotData) return;
+
+    try {
+      setIsBooking(true);
+      setBookingError(null);
+
+      // Get user email from Auth0
+      if (!user?.email) {
+        throw new Error('You must be logged in to book an appointment. Please sign in first.');
+      }
+      const userEmail = user.email;
+
+      // Parse date and time from slot
+      // Slot format: "Tue, Nov 12" and "9:30 AM"
+      // We need to convert this to a proper datetime
+      const slotDate = selectedSlotData.date; // e.g., "Tue, Nov 12"
+      const slotTime = selectedSlotData.time; // e.g., "9:30 AM"
+      
+      // Create a proper datetime string
+      // For now, we'll use today's date + the time, or parse the date string
+      // In production, you'd want to properly parse the date string
+      const now = new Date();
+      const [time, period] = slotTime.split(' ');
+      const [hours, minutes] = time.split(':');
+      let hour24 = parseInt(hours);
+      if (period === 'PM' && hour24 !== 12) hour24 += 12;
+      if (period === 'AM' && hour24 === 12) hour24 = 0;
+      
+      // Create appointment date (for demo, use next week if date is in the future)
+      // In production, parse the actual date from slotDate
+      const appointmentDate = new Date(now);
+      appointmentDate.setDate(now.getDate() + 7); // Default to next week
+      appointmentDate.setHours(hour24, parseInt(minutes), 0, 0);
+      
+      const appointmentDateTime = appointmentDate.toISOString();
+
+      // Create appointment via API
+      const response = await fetch('/api/appointments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userEmailAddress: userEmail,
+          doctorId: selectedProviderData.id,
+          appointmentDate: appointmentDateTime,
+          appointmentTime: slotTime,
+          appointmentType: selectedSlotData.mode === 'telehealth' ? 'telehealth' : 'in-person',
+          status: 'scheduled',
+          estimatedCost: selectedProviderData.estimatedCost,
+          notes: `Appointment with ${selectedProviderData.name} for ${selectedProviderData.specialty}`,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create appointment');
+      }
+
+      // Success!
+      setIsConfirmed(true);
+      setIsBookingOpen(false);
+      setSelectedProvider(null);
+      setSelectedSlot(null);
+      
+      // Show success message for 5 seconds
+      setTimeout(() => setIsConfirmed(false), 5000);
+    } catch (err: any) {
+      console.error('Error booking appointment:', err);
+      setBookingError(err.message || 'Failed to book appointment. Please try again.');
+    } finally {
+      setIsBooking(false);
+    }
   };
 
   const selectedProviderData = providers.find(p => p.id === selectedProvider);
@@ -198,7 +276,7 @@ export default function SchedulingPage() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-4">
               <Button asChild variant="ghost" size="sm">
-                <Link href="/" className="flex items-center gap-2">
+                <Link href={dashboardUrl} className="flex items-center gap-2">
                   <ArrowLeft className="h-4 w-4" />
                   Back
                 </Link>
@@ -209,7 +287,7 @@ export default function SchedulingPage() {
               </div>
             </div>
             <Button asChild variant="outline">
-              <Link href="/">Home</Link>
+              <Link href={dashboardUrl}>Dashboard</Link>
             </Button>
           </div>
         </div>
@@ -222,6 +300,18 @@ export default function SchedulingPage() {
             <div className="flex items-center gap-2 text-green-800">
               <CheckCircle2 className="h-5 w-5" />
               <span className="font-medium">Appointment confirmed! Check your email for details.</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error Banner */}
+      {bookingError && (
+        <div className="bg-red-50 border-b border-red-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex items-center gap-2 text-red-800">
+              <AlertCircle className="h-5 w-5" />
+              <span className="font-medium">{bookingError}</span>
             </div>
           </div>
         </div>
@@ -338,6 +428,7 @@ export default function SchedulingPage() {
             setIsBookingOpen(false);
             setSelectedProvider(null);
             setSelectedSlot(null);
+            setBookingError(null);
           }}
           provider={{
             name: selectedProviderData.name,
@@ -351,6 +442,8 @@ export default function SchedulingPage() {
             estimatedCost: selectedProviderData.estimatedCost,
           }}
           onConfirm={handleConfirmBooking}
+          isBooking={isBooking}
+          error={bookingError}
         />
       )}
     </div>

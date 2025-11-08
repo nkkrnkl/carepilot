@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { useUser } from '@auth0/nextjs-auth0/client';
+import { useDashboardUrl } from '@/lib/navigation';
 import { 
   Beaker,
   TrendingUp,
@@ -53,6 +55,7 @@ const capabilities = [
 ];
 
 export default function LabAnalysisPage() {
+  const dashboardUrl = useDashboardUrl();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<{
@@ -133,7 +136,7 @@ export default function LabAnalysisPage() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-4">
               <Button asChild variant="ghost" size="sm">
-                <Link href="/" className="flex items-center gap-2">
+                <Link href={dashboardUrl} className="flex items-center gap-2">
                   <ArrowLeft className="h-4 w-4" />
                   Back
                 </Link>
@@ -144,7 +147,7 @@ export default function LabAnalysisPage() {
               </div>
             </div>
             <Button asChild variant="outline">
-              <Link href="/">Home</Link>
+              <Link href={dashboardUrl}>Dashboard</Link>
             </Button>
           </div>
         </div>

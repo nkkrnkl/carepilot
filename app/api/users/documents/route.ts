@@ -1,17 +1,17 @@
 /**
  * API Route for user documents
+ * Documents are now stored in the user table as a JSON field
  * GET /api/users/documents?userId=... - Get all documents for a user
- * POST /api/users/documents - Create a new document
- * DELETE /api/users/documents?userId=...&documentId=... - Delete a document
+ * POST /api/users/documents - Add a document to a user
+ * DELETE /api/users/documents?userId=...&documentIndex=... - Remove a document from a user
  */
 
 import { NextResponse } from "next/server";
 import {
-  createDocument,
-  getUserDocuments,
-  deleteDocument,
-  type DocumentEntity,
-} from "@/lib/azure/table-storage";
+  getUserByEmail,
+  updateUser,
+  type Document,
+} from "@/lib/azure/sql-storage";
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +27,16 @@ export async function GET(request: Request) {
       );
     }
 
-    const documents = await getUserDocuments(userId);
+    const user = await getUserByEmail(userId);
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "User not found" },
+        { status: 404 }
+      );
+    }
+
+    // Parse documents from JSON string
+    const documents: Document[] = user.documents ? JSON.parse(user.documents) : [];
     return NextResponse.json({ success: true, documents, count: documents.length });
   } catch (error: any) {
     console.error("Error fetching documents:", error);
@@ -43,19 +52,44 @@ export async function POST(request: Request) {
     const documentData = await request.json();
 
     // Validate required fields
-    if (!documentData.user_id || !documentData.doc_type || !documentData.doc_name) {
+    if (!documentData.userId || !documentData.doc_type || !documentData.doc_name) {
       return NextResponse.json(
-        { success: false, error: "Missing required fields: user_id, doc_type, doc_name" },
+        { success: false, error: "Missing required fields: userId, doc_type, doc_name" },
         { status: 400 }
       );
     }
 
-    await createDocument(documentData as Omit<DocumentEntity, "partitionKey" | "rowKey" | "timestamp">);
-    return NextResponse.json({ success: true, message: "Document created successfully" });
+    const user = await getUserByEmail(documentData.userId);
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "User not found" },
+        { status: 404 }
+      );
+    }
+
+    // Get existing documents
+    const documents: Document[] = user.documents ? JSON.parse(user.documents) : [];
+    
+    // Add new document
+    const newDocument: Document = {
+      doc_type: documentData.doc_type,
+      doc_name: documentData.doc_name,
+      doc_url: documentData.doc_url,
+      doc_size: documentData.doc_size,
+      uploaded_at: new Date().toISOString(),
+    };
+    documents.push(newDocument);
+
+    // Update user with new documents
+    await updateUser(documentData.userId, {
+      documents: JSON.stringify(documents),
+    });
+
+    return NextResponse.json({ success: true, message: "Document added successfully", document: newDocument });
   } catch (error: any) {
-    console.error("Error creating document:", error);
+    console.error("Error adding document:", error);
     return NextResponse.json(
-      { success: false, error: error.message || "Failed to create document" },
+      { success: false, error: error.message || "Failed to add document" },
       { status: 500 }
     );
   }
@@ -65,21 +99,51 @@ export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get("userId");
-    const documentId = searchParams.get("documentId");
+    const documentIndex = searchParams.get("documentIndex");
 
-    if (!userId || !documentId) {
+    if (!userId) {
       return NextResponse.json(
-        { success: false, error: "userId and documentId are required" },
+        { success: false, error: "userId is required" },
         { status: 400 }
       );
     }
 
-    await deleteDocument(userId, documentId);
-    return NextResponse.json({ success: true, message: "Document deleted successfully" });
+    const user = await getUserByEmail(userId);
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: "User not found" },
+        { status: 404 }
+      );
+    }
+
+    // Get existing documents
+    const documents: Document[] = user.documents ? JSON.parse(user.documents) : [];
+    
+    // Remove document by index
+    if (documentIndex !== null) {
+      const index = parseInt(documentIndex);
+      if (isNaN(index) || index < 0 || index >= documents.length) {
+        return NextResponse.json(
+          { success: false, error: "Invalid document index" },
+          { status: 400 }
+        );
+      }
+      documents.splice(index, 1);
+    } else {
+      // If no index provided, remove all documents
+      documents.length = 0;
+    }
+
+    // Update user with updated documents
+    await updateUser(userId, {
+      documents: JSON.stringify(documents),
+    });
+
+    return NextResponse.json({ success: true, message: "Document removed successfully" });
   } catch (error: any) {
-    console.error("Error deleting document:", error);
+    console.error("Error removing document:", error);
     return NextResponse.json(
-      { success: false, error: error.message || "Failed to delete document" },
+      { success: false, error: error.message || "Failed to remove document" },
       { status: 500 }
     );
   }

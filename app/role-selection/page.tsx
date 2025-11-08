@@ -1,81 +1,94 @@
 "use client";
 
-import { useState } from "react";
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { useUser } from '@auth0/nextjs-auth0/client';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { UserPlus, User, Stethoscope, ArrowRight } from "lucide-react";
+import { User, Stethoscope, ArrowRight, Loader2 } from "lucide-react";
+import Link from "next/link";
 
-export default function SignUpPage() {
+export default function RoleSelectionPage() {
   const router = useRouter();
-  const { user, isLoading } = useUser();
+  const { user, isLoading: authLoading } = useUser();
   const [selectedRole, setSelectedRole] = useState<"patient" | "doctor" | null>(null);
-  const [showRoleSelection, setShowRoleSelection] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user && !isLoading) {
-      // Check if user has a role set, if not, redirect to role selection
-      checkUserRole();
+    // Check if role is stored in sessionStorage from signup
+    const signupRole = sessionStorage.getItem("signupRole");
+    if (signupRole && (signupRole === "patient" || signupRole === "doctor")) {
+      setSelectedRole(signupRole as "patient" | "doctor");
+      // Automatically save if role was selected during signup
+      handleSaveRole(signupRole as "patient" | "doctor");
     }
-  }, [user, isLoading]);
+  }, []);
 
-  async function checkUserRole() {
-    if (!user?.email) return;
-    
+  async function handleSaveRole(role: "patient" | "doctor") {
+    if (!user?.email) {
+      setError("You must be logged in to set your role");
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+
     try {
-      const response = await fetch(`/api/users?emailAddress=${encodeURIComponent(user.email)}`);
+      const response = await fetch("/api/users/role", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ role }),
+      });
+
       const data = await response.json();
-      
-      if (data.success && data.user?.userRole) {
-        // User has a role, redirect to appropriate dashboard
-        router.push(data.user.userRole === "doctor" ? "/doctorportal" : "/patient");
-      } else {
-        // User doesn't have a role set, show role selection
-        setShowRoleSelection(true);
+
+      if (!data.success) {
+        throw new Error(data.error || "Failed to save role");
       }
-    } catch (error) {
-      console.error("Error checking user role:", error);
-      // On error, show role selection
-      setShowRoleSelection(true);
+
+      // Clear signup role from sessionStorage
+      sessionStorage.removeItem("signupRole");
+
+      // Redirect to appropriate dashboard
+      router.push(role === "doctor" ? "/doctorportal" : "/patient");
+    } catch (err: any) {
+      console.error("Error saving role:", err);
+      setError(err.message || "Failed to save role. Please try again.");
+      setSaving(false);
     }
   }
 
   function handleRoleSelect(role: "patient" | "doctor") {
     setSelectedRole(role);
-    // Store role in sessionStorage to retrieve after Auth0 callback
-    sessionStorage.setItem("signupRole", role);
-    // Redirect to Auth0 with role in state parameter
-    const authUrl = `/auth/login?screen_hint=signup&role=${role}`;
-    window.location.href = authUrl;
+    handleSaveRole(role);
   }
 
-  if (isLoading) {
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
         <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
           <p className="text-gray-600">Loading...</p>
         </div>
       </div>
     );
   }
 
-  // If user is logged in but no role selection shown yet, show loading
-  if (user && showRoleSelection && selectedRole === null) {
+  if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600">Setting up your account...</p>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Authentication Required</h1>
+          <p className="text-gray-600 mb-6">You must be logged in to select your role.</p>
+          <Button asChild>
+            <Link href="/signin">Sign In</Link>
+          </Button>
         </div>
       </div>
     );
-  }
-
-  // If user is logged in and has role, they'll be redirected
-  if (user && !showRoleSelection) {
-    return null;
   }
 
   return (
@@ -85,9 +98,15 @@ export default function SignUpPage() {
           <Link href="/" className="inline-block mb-4">
             <h1 className="text-3xl font-bold text-gray-900">CarePilot</h1>
           </Link>
-          <p className="text-gray-600 text-lg">Create your account</p>
-          <p className="text-gray-500 text-sm mt-2">Choose your account type to get started</p>
+          <p className="text-gray-600 text-lg">Complete your account setup</p>
+          <p className="text-gray-500 text-sm mt-2">Please select your account type to continue</p>
         </div>
+
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
+            {error}
+          </div>
+        )}
         
         <div className="grid md:grid-cols-2 gap-6">
           {/* Patient Card */}
@@ -96,8 +115,8 @@ export default function SignUpPage() {
               selectedRole === "patient" 
                 ? "border-blue-600 bg-blue-50" 
                 : "border-gray-200 hover:border-blue-300"
-            }`}
-            onClick={() => handleRoleSelect("patient")}
+            } ${saving && selectedRole !== "patient" ? "opacity-50 cursor-not-allowed" : ""}`}
+            onClick={() => !saving && handleRoleSelect("patient")}
           >
             <CardHeader className="text-center pb-4">
               <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-blue-100 flex items-center justify-center">
@@ -122,17 +141,27 @@ export default function SignUpPage() {
                   <span className="text-blue-600 mt-1">•</span>
                   <span>Manage bills and insurance claims</span>
                 </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-600 mt-1">•</span>
-                  <span>Track your health journey</span>
-                </li>
               </ul>
               <Button 
-                className={`w-full ${selectedRole === "patient" ? "bg-blue-600 hover:bg-blue-700" : ""}`}
+                className="w-full"
                 variant={selectedRole === "patient" ? "default" : "outline"}
+                disabled={saving}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRoleSelect("patient");
+                }}
               >
-                Continue as Patient
-                <ArrowRight className="ml-2 h-4 w-4" />
+                {saving && selectedRole === "patient" ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Setting up...
+                  </>
+                ) : (
+                  <>
+                    Continue as Patient
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </>
+                )}
               </Button>
             </CardContent>
           </Card>
@@ -143,8 +172,8 @@ export default function SignUpPage() {
               selectedRole === "doctor" 
                 ? "border-green-600 bg-green-50" 
                 : "border-gray-200 hover:border-green-300"
-            }`}
-            onClick={() => handleRoleSelect("doctor")}
+            } ${saving && selectedRole !== "doctor" ? "opacity-50 cursor-not-allowed" : ""}`}
+            onClick={() => !saving && handleRoleSelect("doctor")}
           >
             <CardHeader className="text-center pb-4">
               <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-green-100 flex items-center justify-center">
@@ -169,34 +198,33 @@ export default function SignUpPage() {
                   <span className="text-green-600 mt-1">•</span>
                   <span>Write prescriptions and generate reports</span>
                 </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-green-600 mt-1">•</span>
-                  <span>Access clinical dashboard</span>
-                </li>
               </ul>
               <Button 
-                className={`w-full ${selectedRole === "doctor" ? "bg-green-600 hover:bg-green-700" : ""}`}
+                className="w-full"
                 variant={selectedRole === "doctor" ? "default" : "outline"}
+                disabled={saving}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRoleSelect("doctor");
+                }}
               >
-                Continue as Doctor
-                <ArrowRight className="ml-2 h-4 w-4" />
+                {saving && selectedRole === "doctor" ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Setting up...
+                  </>
+                ) : (
+                  <>
+                    Continue as Doctor
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </>
+                )}
               </Button>
             </CardContent>
           </Card>
-        </div>
-        
-        <div className="mt-6 text-center">
-          <p className="text-sm text-gray-600">
-            Already have an account?{" "}
-            <Link href="/signin" className="text-blue-600 hover:text-blue-800 font-medium">
-              Sign In
-            </Link>
-          </p>
-          <Link href="/" className="text-sm text-gray-600 hover:text-gray-900 block mt-2">
-            ← Back to Home
-          </Link>
         </div>
       </div>
     </div>
   );
 }
+

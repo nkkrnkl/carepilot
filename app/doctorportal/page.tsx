@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useUser } from '@auth0/nextjs-auth0/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -66,18 +67,32 @@ const patientStatusData = [
   { label: "Discharged", value: 5, count: "9 this week", change: "+2%", color: "bg-purple-500" },
 ];
 
-const todayAppointments = [
-  { time: "9:00 AM", patient: "Sarah Johnson", type: "Follow-up", status: "Confirmed" },
-  { time: "9:30 AM", patient: "Michael Chen", type: "New Patient", status: "Confirmed" },
-  { time: "10:15 AM", patient: "Emily Rodriguez", type: "Consultation", status: "Waiting" },
-  { time: "11:00 AM", patient: "David Thompson", type: "Follow-up", status: "Confirmed" },
-  { time: "2:00 PM", patient: "Lisa Anderson", type: "Lab Review", status: "Pending" },
-  { time: "3:30 PM", patient: "Robert Wilson", type: "Follow-up", status: "Confirmed" },
-];
+interface AppointmentWithPatient {
+  appointment_id: string;
+  userEmailAddress: string;
+  doctorId: string;
+  appointmentDate: string;
+  appointmentTime: string;
+  appointmentType: string;
+  status: string;
+  confirmationCode?: string;
+  notes?: string;
+  estimatedCost?: number;
+  patient: {
+    name: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  };
+}
 
 export default function DoctorsDashboard() {
   const router = useRouter();
+  const { user, isLoading: authLoading } = useUser();
   const [activeModal, setActiveModal] = useState<string | null>(null);
+  const [appointments, setAppointments] = useState<AppointmentWithPatient[]>([]);
+  const [loadingAppointments, setLoadingAppointments] = useState(true);
+  const [doctorId, setDoctorId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     patientName: "",
     patientId: "",
@@ -85,6 +100,118 @@ export default function DoctorsDashboard() {
     prescription: "",
     message: "",
     reportType: ""
+  });
+
+  // Fetch doctor ID and appointments
+  useEffect(() => {
+    async function fetchDoctorAndAppointments() {
+      if (authLoading || !user?.email) return;
+
+      try {
+        // Get all doctors to find appointments
+        // In production, you'd link doctor email to doctor ID via a user-doctor mapping
+        const response = await fetch('/api/doctors');
+        const doctorsData = await response.json();
+        
+        if (doctorsData.success && doctorsData.data && doctorsData.data.length > 0) {
+          // For demo: fetch appointments for all doctors
+          // In production, match logged-in doctor's email to doctor ID
+          const allAppointments: AppointmentWithPatient[] = [];
+          
+          // Get today's date range
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const tomorrow = new Date(today);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          
+          // Fetch appointments for each doctor
+          for (const doctor of doctorsData.data) {
+            try {
+              const appointmentsResponse = await fetch(
+                `/api/appointments?doctorId=${doctor.id}&startDate=${today.toISOString()}&endDate=${tomorrow.toISOString()}`
+              );
+              const appointmentsData = await appointmentsResponse.json();
+              
+              if (appointmentsData.success && appointmentsData.appointments) {
+                // Enrich with patient information
+                for (const apt of appointmentsData.appointments) {
+                  try {
+                    const patientResponse = await fetch(`/api/users?emailAddress=${encodeURIComponent(apt.userEmailAddress)}`);
+                    const patientData = await patientResponse.json();
+                    
+                    const patient = patientData.success && patientData.user
+                      ? {
+                          name: `${patientData.user.FirstName} ${patientData.user.LastName}`,
+                          email: patientData.user.emailAddress,
+                          firstName: patientData.user.FirstName,
+                          lastName: patientData.user.LastName,
+                        }
+                      : {
+                          name: apt.userEmailAddress,
+                          email: apt.userEmailAddress,
+                          firstName: "Unknown",
+                          lastName: "Patient",
+                        };
+                    
+                    allAppointments.push({
+                      ...apt,
+                      patient,
+                    });
+                  } catch (err) {
+                    console.error(`Error fetching patient ${apt.userEmailAddress}:`, err);
+                    allAppointments.push({
+                      ...apt,
+                      patient: {
+                        name: apt.userEmailAddress,
+                        email: apt.userEmailAddress,
+                        firstName: "Unknown",
+                        lastName: "Patient",
+                      },
+                    });
+                  }
+                }
+              }
+            } catch (err) {
+              console.error(`Error fetching appointments for doctor ${doctor.id}:`, err);
+            }
+          }
+          
+          setAppointments(allAppointments);
+        }
+      } catch (error) {
+        console.error("Error fetching appointments:", error);
+      } finally {
+        setLoadingAppointments(false);
+      }
+    }
+
+    fetchDoctorAndAppointments();
+  }, [user, authLoading]);
+
+  // Format appointments for display
+  const todayAppointments = appointments.map((apt) => {
+    const appointmentDate = new Date(apt.appointmentDate);
+    const timeStr = appointmentDate.toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit',
+      hour12: true 
+    });
+    
+    return {
+      id: apt.appointment_id,
+      time: timeStr,
+      patient: apt.patient.name,
+      type: apt.appointmentType === 'telehealth' ? 'Telehealth' : 'In-Person',
+      status: apt.status.charAt(0).toUpperCase() + apt.status.slice(1),
+      appointmentType: apt.appointmentType,
+      email: apt.patient.email,
+      confirmationCode: apt.confirmationCode,
+    };
+  }).sort((a, b) => {
+    // Sort by time
+    const timeA = a.time;
+    const timeB = b.time;
+    return timeA.localeCompare(timeB);
   });
 
   const handleNewPatientVisit = () => {
@@ -173,10 +300,12 @@ export default function DoctorsDashboard() {
             <Calendar className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12</div>
+            <div className="text-2xl font-bold">
+              {loadingAppointments ? "..." : todayAppointments.length}
+            </div>
             <div className="flex items-center text-xs text-green-600 mt-1">
               <TrendingUp className="h-3 w-3 mr-1" />
-              +2 from yesterday
+              {loadingAppointments ? "Loading..." : `${todayAppointments.filter(a => a.status === 'Scheduled' || a.status === 'Confirmed').length} confirmed`}
             </div>
             <Button variant="outline" size="sm" className="mt-4 w-full text-xs">
               View Schedule
@@ -303,24 +432,44 @@ export default function DoctorsDashboard() {
             <CardDescription>Upcoming appointments</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {todayAppointments.slice(0, 5).map((appointment, index) => (
-              <div key={index} className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 transition-colors">
-                <div className="flex items-center gap-3">
-                  <Clock className="h-4 w-4 text-gray-400" />
-                  <div>
-                    <div className="font-semibold text-sm">{appointment.time}</div>
-                    <div className="text-xs text-gray-500">{appointment.patient}</div>
-                    <div className="text-xs text-gray-400">{appointment.type}</div>
-                  </div>
-                </div>
-                <Badge variant={appointment.status === 'Confirmed' ? 'default' : appointment.status === 'Waiting' ? 'secondary' : 'outline'}>
-                  {appointment.status}
-                </Badge>
+            {loadingAppointments ? (
+              <div className="text-center py-4">
+                <div className="text-sm text-gray-500">Loading appointments...</div>
               </div>
-            ))}
-            <Button variant="outline" size="sm" className="w-full mt-2">
-              View Full Schedule
-            </Button>
+            ) : todayAppointments.length === 0 ? (
+              <div className="text-center py-4">
+                <div className="text-sm text-gray-500">No appointments scheduled for today</div>
+              </div>
+            ) : (
+              <>
+                {todayAppointments.slice(0, 5).map((appointment) => (
+                  <div key={appointment.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <Clock className="h-4 w-4 text-gray-400" />
+                      <div>
+                        <div className="font-semibold text-sm">{appointment.time}</div>
+                        <div className="text-xs text-gray-500">{appointment.patient}</div>
+                        <div className="text-xs text-gray-400">{appointment.type}</div>
+                      </div>
+                    </div>
+                    <Badge variant={
+                      appointment.status === 'Scheduled' || appointment.status === 'Confirmed' 
+                        ? 'default' 
+                        : appointment.status === 'Waiting' 
+                        ? 'secondary' 
+                        : 'outline'
+                    }>
+                      {appointment.status}
+                    </Badge>
+                  </div>
+                ))}
+                {todayAppointments.length > 5 && (
+                  <Button variant="outline" size="sm" className="w-full mt-2">
+                    View Full Schedule ({todayAppointments.length} total)
+                  </Button>
+                )}
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

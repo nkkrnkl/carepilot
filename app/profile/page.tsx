@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { useUser } from '@auth0/nextjs-auth0/client';
+import { useDashboardUrl } from '@/lib/navigation';
 import {
   ArrowLeft,
   User,
@@ -13,7 +15,6 @@ import {
   CreditCard,
   Building,
   MapPin,
-  DollarSign,
   Save,
   CheckCircle2,
   AlertCircle,
@@ -24,11 +25,11 @@ import {
 } from "lucide-react";
 
 export default function ProfilePage() {
+  const dashboardUrl = useDashboardUrl();
   const [formData, setFormData] = useState({
     // Personal Information
     firstName: "",
     lastName: "",
-    middleName: "",
     dateOfBirth: "",
     email: "",
     phone: "",
@@ -36,6 +37,7 @@ export default function ProfilePage() {
     city: "",
     state: "",
     zipCode: "",
+    preferredLanguage: "English",
     
     // Insurance Information
     insuranceCompany: "",
@@ -47,25 +49,6 @@ export default function ProfilePage() {
     insuranceCompanyState: "",
     insuranceCompanyZipCode: "",
     insuranceCompanyPhone: "",
-    
-    // Insurance Coverage Details
-    deductibleAmount: "",
-    deductibleRemaining: "",
-    outOfPocketMaximum: "",
-    outOfPocketRemaining: "",
-    copayAmount: "",
-    coinsurancePercentage: "",
-    
-    // Emergency Contact
-    emergencyContactName: "",
-    emergencyContactRelationship: "",
-    emergencyContactPhone: "",
-    
-    // Additional Information
-    preferredLanguage: "en",
-    primaryCarePhysician: "",
-    pharmacyName: "",
-    pharmacyAddress: "",
   });
 
   const [isSaved, setIsSaved] = useState(false);
@@ -91,7 +74,7 @@ export default function ProfilePage() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-4">
               <Button asChild variant="ghost" size="sm">
-                <Link href="/patient" className="flex items-center gap-2">
+                <Link href={dashboardUrl} className="flex items-center gap-2">
                   <ArrowLeft className="h-4 w-4" />
                   Back
                 </Link>
@@ -102,7 +85,7 @@ export default function ProfilePage() {
               </div>
             </div>
             <Button asChild variant="outline">
-              <Link href="/patient">Dashboard</Link>
+              <Link href={dashboardUrl}>Dashboard</Link>
             </Button>
           </div>
         </div>
@@ -136,7 +119,7 @@ export default function ProfilePage() {
               </div>
             </div>
             <CardContent className="pt-6 pb-8 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-gray-700 mb-2 block">
                     First Name *
@@ -146,16 +129,6 @@ export default function ProfilePage() {
                     placeholder="John"
                     value={formData.firstName}
                     onChange={(e) => handleChange("firstName", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-2 block">
-                    Middle Name
-                  </label>
-                  <Input
-                    placeholder="Michael"
-                    value={formData.middleName}
-                    onChange={(e) => handleChange("middleName", e.target.value)}
                   />
                 </div>
                 <div>
@@ -193,11 +166,11 @@ export default function ProfilePage() {
                     onChange={(e) => handleChange("preferredLanguage", e.target.value)}
                     className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
                   >
-                    <option value="en">English</option>
-                    <option value="es">Spanish</option>
-                    <option value="zh">Chinese</option>
-                    <option value="fr">French</option>
-                    <option value="ar">Arabic</option>
+                    <option value="English">English</option>
+                    <option value="Spanish">Spanish</option>
+                    <option value="Chinese">Chinese</option>
+                    <option value="French">French</option>
+                    <option value="Arabic">Arabic</option>
                   </select>
                 </div>
               </div>
@@ -410,223 +383,6 @@ export default function ProfilePage() {
                     onChange={(e) => handleChange("insuranceCompanyPhone", e.target.value)}
                   />
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Insurance Coverage Details Section */}
-          <Card className="mb-6 border-2 border-green-200 overflow-hidden py-0">
-            <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-b px-6 py-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
-                  <DollarSign className="h-5 w-5 text-green-600" />
-                </div>
-                <div className="flex flex-col">
-                  <CardTitle className="text-2xl mb-1">Coverage Details</CardTitle>
-                  <CardDescription className="m-0">Your insurance coverage and cost information</CardDescription>
-                </div>
-              </div>
-            </div>
-            <CardContent className="pt-6 pb-8 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-2 block">
-                    Annual Deductible Amount *
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                    <Input
-                      required
-                      type="number"
-                      placeholder="5000"
-                      className="pl-7"
-                      value={formData.deductibleAmount}
-                      onChange={(e) => handleChange("deductibleAmount", e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-2 block">
-                    Deductible Remaining
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                    <Input
-                      type="number"
-                      placeholder="2500"
-                      className="pl-7"
-                      value={formData.deductibleRemaining}
-                      onChange={(e) => handleChange("deductibleRemaining", e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-2 block">
-                    Out-of-Pocket Maximum
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                    <Input
-                      type="number"
-                      placeholder="8000"
-                      className="pl-7"
-                      value={formData.outOfPocketMaximum}
-                      onChange={(e) => handleChange("outOfPocketMaximum", e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-2 block">
-                    Out-of-Pocket Remaining
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                    <Input
-                      type="number"
-                      placeholder="4000"
-                      className="pl-7"
-                      value={formData.outOfPocketRemaining}
-                      onChange={(e) => handleChange("outOfPocketRemaining", e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-2 block">
-                    Copay Amount
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                    <Input
-                      type="number"
-                      placeholder="25"
-                      className="pl-7"
-                      value={formData.copayAmount}
-                      onChange={(e) => handleChange("copayAmount", e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-2 block">
-                    Coinsurance Percentage
-                  </label>
-                  <div className="relative">
-                    <Input
-                      type="number"
-                      placeholder="20"
-                      className="pr-7"
-                      value={formData.coinsurancePercentage}
-                      onChange={(e) => handleChange("coinsurancePercentage", e.target.value)}
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">%</span>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Emergency Contact Section */}
-          <Card className="mb-6 border-2 border-orange-200 overflow-hidden py-0">
-            <div className="bg-gradient-to-r from-orange-50 to-amber-50 border-b px-6 py-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
-                  <User className="h-5 w-5 text-orange-600" />
-                </div>
-                <div className="flex flex-col">
-                  <CardTitle className="text-2xl mb-1">Emergency Contact</CardTitle>
-                  <CardDescription className="m-0">Contact information for emergencies</CardDescription>
-                </div>
-              </div>
-            </div>
-            <CardContent className="pt-6 pb-8 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-2 block">
-                    Contact Name *
-                  </label>
-                  <Input
-                    required
-                    placeholder="Jane Doe"
-                    value={formData.emergencyContactName}
-                    onChange={(e) => handleChange("emergencyContactName", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-2 block">
-                    Relationship *
-                  </label>
-                  <Input
-                    required
-                    placeholder="Spouse"
-                    value={formData.emergencyContactRelationship}
-                    onChange={(e) => handleChange("emergencyContactRelationship", e.target.value)}
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-2 block flex items-center gap-2">
-                  <Phone className="h-4 w-4" />
-                  Contact Phone Number *
-                </label>
-                <Input
-                  required
-                  type="tel"
-                  placeholder="+1 (555) 987-6543"
-                  value={formData.emergencyContactPhone}
-                  onChange={(e) => handleChange("emergencyContactPhone", e.target.value)}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Additional Information Section */}
-          <Card className="mb-6 border-2 border-purple-200 overflow-hidden py-0">
-            <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-b px-6 py-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
-                  <FileText className="h-5 w-5 text-purple-600" />
-                </div>
-                <div className="flex flex-col">
-                  <CardTitle className="text-2xl mb-1">Additional Information</CardTitle>
-                  <CardDescription className="m-0">Healthcare provider and pharmacy details</CardDescription>
-                </div>
-              </div>
-            </div>
-            <CardContent className="pt-6 pb-8 space-y-4">
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-2 block">
-                  Primary Care Physician
-                </label>
-                <Input
-                  placeholder="Dr. Sarah Martinez"
-                  value={formData.primaryCarePhysician}
-                  onChange={(e) => handleChange("primaryCarePhysician", e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-2 block">
-                  Pharmacy Name
-                </label>
-                <Input
-                  placeholder="CVS Pharmacy"
-                  value={formData.pharmacyName}
-                  onChange={(e) => handleChange("pharmacyName", e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-2 block">
-                  Pharmacy Address
-                </label>
-                <Input
-                  placeholder="456 Main Street, Cambridge, MA 02139"
-                  value={formData.pharmacyAddress}
-                  onChange={(e) => handleChange("pharmacyAddress", e.target.value)}
-                />
               </div>
             </CardContent>
           </Card>

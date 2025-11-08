@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useUser } from '@auth0/nextjs-auth0/client';
+import { useDashboardUrl } from '@/lib/navigation';
 import { 
   FileText,
   Shield,
@@ -53,6 +55,8 @@ const capabilities = [
 ];
 
 export default function ClaimsPage() {
+  const { user } = useUser();
+  const dashboardUrl = useDashboardUrl();
   const [userId] = useState("user-123"); // In production, get from auth
   const [uploadedDocs, setUploadedDocs] = useState<Array<{ id: string; type: string; name: string }>>([]);
   const [activeTab, setActiveTab] = useState<"upload" | "process">("upload");
@@ -65,7 +69,7 @@ export default function ClaimsPage() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-4">
               <Button asChild variant="ghost" size="sm">
-                <Link href="/" className="flex items-center gap-2">
+                <Link href={dashboardUrl} className="flex items-center gap-2">
                   <ArrowLeft className="h-4 w-4" />
                   Back
                 </Link>
@@ -76,7 +80,7 @@ export default function ClaimsPage() {
               </div>
             </div>
             <Button asChild variant="outline">
-              <Link href="/">Home</Link>
+              <Link href={dashboardUrl}>Dashboard</Link>
             </Button>
           </div>
         </div>
