@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "generate-doctors": "node scripts/generate-mock-doctors.js",
-    "upload-doctors": "node scripts/upload-doctors-to-azure.js"
+    "upload-doctors": "node scripts/upload-doctors-to-azure.js",
+    "list-containers": "node scripts/list-azure-containers.js"
   },
   "dependencies": {
     "@azure/storage-blob": "^12.29.1",

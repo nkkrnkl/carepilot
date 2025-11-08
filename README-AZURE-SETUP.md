@@ -13,9 +13,21 @@ This guide explains how to set up Azure Blob Storage to store and retrieve docto
 ### 1. Create Azure Storage Account
 
 1. Go to [Azure Portal](https://portal.azure.com)
-2. Create a new Storage Account
+2. Create a new Storage Account (or use existing: `hackstoragexz`)
 3. Go to **Access Keys** in the left sidebar
 4. Copy the **Connection string** from Key1 or Key2
+
+### 1.1. List Containers (Optional)
+
+You can list existing containers using Azure CLI:
+```bash
+az storage container list --account-name hackstoragexz --subscription 41f56be4-b097-45ca-b7a6-b064a0c7189e
+```
+
+Or using the Node.js script (requires connection string in .env):
+```bash
+npm run list-containers
+```
 
 ### 2. Configure Environment Variables
 
@@ -48,7 +60,21 @@ npm run generate-doctors
 
 This creates a `data/doctors.json` file with 20 mock doctors.
 
-### 5. Upload to Azure Blob Storage
+### 5. List Containers (Optional)
+
+Check existing containers in your storage account:
+
+**Using Azure CLI:**
+```bash
+az storage container list --account-name hackstoragexz --subscription 41f56be4-b097-45ca-b7a6-b064a0c7189e
+```
+
+**Using Node.js script:**
+```bash
+npm run list-containers
+```
+
+### 6. Upload to Azure Blob Storage
 
 Upload the generated data to Azure:
 
@@ -61,7 +87,7 @@ This will:
 - Upload `doctors.json` to the container
 - Display the public URL of the uploaded file
 
-### 6. Verify Setup
+### 7. Verify Setup
 
 1. Check Azure Portal to confirm the blob was uploaded
 2. Visit the scheduling page to see doctors loaded from Azure
