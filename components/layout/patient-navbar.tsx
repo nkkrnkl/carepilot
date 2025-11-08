@@ -36,11 +36,13 @@ export function PatientNavbar() {
                 <Settings className="h-5 w-5" />
               </Link>
             </Button>
-            <Avatar>
-              <AvatarFallback className="bg-blue-600 text-white">
-                <User className="h-5 w-5" />
-              </AvatarFallback>
-            </Avatar>
+            <Link href="/profile" className="cursor-pointer">
+              <Avatar className="hover:ring-2 hover:ring-blue-500 transition-all">
+                <AvatarFallback className="bg-blue-600 text-white">
+                  <User className="h-5 w-5" />
+                </AvatarFallback>
+              </Avatar>
+            </Link>
             <Button asChild variant="ghost" size="sm">
               <Link href="/">
                 <LogOut className="h-4 w-4 mr-2" />
