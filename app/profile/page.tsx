@@ -597,7 +597,7 @@ export default function ProfilePage() {
                 </div>
               </div>
             </div>
-            <CardContent className="pt-6 space-y-4">
+            <CardContent className="pt-6 pb-8 space-y-4">
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-2 block">
                   Primary Care Physician
