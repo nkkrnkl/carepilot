@@ -33,7 +33,7 @@ export default function SignInPage() {
           <p className="text-gray-600">Sign in to access your dashboard</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
           <SignInCard
             userType={USER_TYPES.PATIENT}
             icon={SIGN_IN_CONFIG.patient.icon}

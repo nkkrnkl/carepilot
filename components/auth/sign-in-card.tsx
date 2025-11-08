@@ -52,17 +52,17 @@ export function SignInCard({
   
   return (
     <Card
-      className={`border-2 ${borderClass} transition-all cursor-pointer`}
+      className={`border-2 ${borderClass} transition-all cursor-pointer h-full flex flex-col`}
       onClick={onUserTypeSelect}
     >
-      <CardHeader className="text-center pb-4">
+      <CardHeader className="text-center pb-4 flex-shrink-0 min-h-[200px] flex flex-col justify-center">
         <div className={`mx-auto h-16 w-16 rounded-full ${color.bg} flex items-center justify-center mb-4`}>
           <Icon className={`h-8 w-8 ${color.text}`} />
         </div>
-        <CardTitle className="text-2xl">{title}</CardTitle>
+        <CardTitle className="text-2xl mb-2">{title}</CardTitle>
         <CardDescription className="text-base">{description}</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex-1 flex flex-col">
         <div className="space-y-4">
           <div className="space-y-2">
             <label htmlFor={`email-${userType}`} className="text-sm font-medium text-gray-700">
@@ -74,7 +74,7 @@ export function SignInCard({
                 id={`email-${userType}`}
                 type="email"
                 placeholder={`${userType}@example.com`}
-                className="pl-10"
+                className="pl-10 h-9"
                 value={email}
                 onChange={(e) => onEmailChange(e.target.value)}
                 onClick={handleInputClick}
@@ -92,7 +92,7 @@ export function SignInCard({
                 id={`password-${userType}`}
                 type="password"
                 placeholder="Enter your password"
-                className="pl-10"
+                className="pl-10 h-9"
                 value={password}
                 onChange={(e) => onPasswordChange(e.target.value)}
                 onClick={handleInputClick}
@@ -101,7 +101,7 @@ export function SignInCard({
             </div>
           </div>
           <Button
-            className={`w-full ${color.button} text-white`}
+            className={`w-full ${color.button} text-white mt-6`}
             onClick={handleButtonClick}
             aria-label={`Sign in as ${userType}`}
           >
