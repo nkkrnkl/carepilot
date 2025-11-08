@@ -12,17 +12,8 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
-    // Get session with request context for route handlers
-    let session;
-    try {
-      session = await auth0.getSession(request);
-    } catch (authError: any) {
-      console.error("Auth0 session error:", authError);
-      return NextResponse.json(
-        { success: false, error: "Authentication error", details: authError.message },
-        { status: 401 }
-      );
-    }
+    // Get session - in App Router, getSession() can be called without parameters
+    const session = await auth0.getSession();
     
     if (!session?.user?.email) {
       return NextResponse.json(
@@ -86,17 +77,8 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    // Get session with request context for route handlers
-    let session;
-    try {
-      session = await auth0.getSession(request);
-    } catch (authError: any) {
-      console.error("Auth0 session error:", authError);
-      return NextResponse.json(
-        { success: false, error: "Authentication error", details: authError.message },
-        { status: 401 }
-      );
-    }
+    // Get session - in App Router, getSession() can be called without parameters
+    const session = await auth0.getSession();
     
     if (!session?.user?.email) {
       return NextResponse.json(
