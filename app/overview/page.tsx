@@ -65,20 +65,20 @@ const featureDetails = [
     description: "Pre-check claims for accuracy before submission to avoid rejections and delays. Verify that all required information is complete and correctly formatted according to your insurance provider's requirements. Ensure clean claims that get processed quickly on first submission, reducing administrative burden. Handle appeals efficiently with automated status tracking and deadline reminders. Stay informed about every step of your insurance claims process with real-time updates and detailed explanations of any issues that arise.",
     icon: FileText,
     link: "/features/claims",
-    gradient: "from-purple-500 to-pink-500",
-    bgGradient: "from-purple-50 to-pink-50",
-    iconBg: "bg-purple-100",
-    iconColor: "text-purple-600",
-    borderColor: "border-purple-200",
-    hoverBorder: "hover:border-purple-400",
-    buttonColor: "bg-purple-600 hover:bg-purple-700",
-    textColor: "text-purple-600"
+    gradient: "from-indigo-500 to-blue-600",
+    bgGradient: "from-indigo-50 to-blue-50",
+    iconBg: "bg-indigo-100",
+    iconColor: "text-indigo-600",
+    borderColor: "border-indigo-200",
+    hoverBorder: "hover:border-indigo-400",
+    buttonColor: "bg-indigo-600 hover:bg-indigo-700",
+    textColor: "text-indigo-600"
   }
 ];
 
 export default function Overview() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-blue-100/20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
         {/* Header Section */}
         <div className="mb-12">
@@ -89,11 +89,11 @@ export default function Overview() {
           </div>
           
           <div className="flex items-center gap-3 mb-6">
-            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center">
+            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center">
               <Sparkles className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent">
                 Overview
               </h1>
               <p className="text-sm text-gray-500 mt-1">CarePilot Features</p>
@@ -181,7 +181,7 @@ export default function Overview() {
         </div>
 
         {/* Call to Action */}
-        <div className="mt-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 shadow-2xl">
+        <div className="mt-12 bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-8 shadow-2xl">
           <div className="text-center text-white">
             <h2 className="text-3xl font-bold mb-4">Ready to Get Started?</h2>
             <p className="text-blue-100 text-lg mb-6 max-w-2xl mx-auto">
