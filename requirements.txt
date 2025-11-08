@@ -1,52 +1,8 @@
-<<<<<<< HEAD
-requests
-python-dotenv
-
-# Database - PostgreSQL with pgvector
-# Note: pgvector is a PostgreSQL extension. Install it in your database:
-#   CREATE EXTENSION vector;
-# For Python, we use psycopg2-binary to connect to PostgreSQL
-psycopg2-binary
-
-# Document Processing
-pdfplumber
-PyPDF2
-Pillow
-pytesseract
-
-# Embeddings and AI - Azure AI Foundry Service
-openai
-azure-identity
-azure-core
-numpy
-
-# Vector Database - Pinecone (Direct API)
-pinecone-client
-
-# LangGraph and LangChain (for agent workflows)
-langgraph
-langchain
-langchain-openai
-langchain-core
-
-# Medical coding and claims processing
-# EDI processing (for HIPAA 837, 270/271 transactions)
-# Note: For production, consider using python-edi or pyx12 for proper EDI handling
-# For now, we use basic string formatting
-
-# Additional utilities
-python-dateutil
-=======
-# CarePilot Python Dependencies
+# Python dependencies have been moved to backend/requirements.txt
 # 
-# Install with: pip install -r requirements.txt
-# For development: pip install -r requirements-dev.txt (if available)
-
-# HTTP library for making API requests
-# Used by api.py for K2 Think LLM API client
-requests>=2.31.0,<3.0.0
-
-# Environment variable management
-# Used to load API keys and configuration from .env files
-python-dotenv>=1.0.0,<2.0.0
->>>>>>> main
+# To install dependencies:
+# cd backend
+# pip install -r requirements.txt
+#
+# Or from the root directory:
+# pip install -r backend/requirements.txt

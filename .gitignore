@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Python
 __pycache__/
 *.py[cod]
@@ -27,6 +26,7 @@ wheels/
 # Environment variables
 .env
 .env.local
+.env.*.local
 
 # IDE
 .vscode/
@@ -61,12 +61,8 @@ Thumbs.db
 *.tmp
 *.temp
 
-
-=======
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
-/node_modules
+# Node.js
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -75,33 +71,28 @@ Thumbs.db
 !.yarn/releases
 !.yarn/versions
 
-# testing
+# Testing
 /coverage
 
-# next.js
+# Next.js
 /.next/
 /out/
 
-# production
+# Production
 /build
 
-# misc
-.DS_Store
+# Misc
 *.pem
 
-# debug
+# Debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
-.vercel
-
-# typescript
+# TypeScript
 *.tsbuildinfo
 next-env.d.ts
->>>>>>> main
+
+# Vercel
+.vercel

@@ -6,6 +6,7 @@ using the 4-step workflow with RAG queries.
 """
 
 import json
+# Imports are in the same directory, no path changes needed
 from pinecone_store import PineconeVectorStore
 from claims_agent import ClaimsAgent
 

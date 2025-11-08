@@ -15,6 +15,7 @@ Pinecone Connection:
 
 import os
 import time
+import re
 from typing import List, Dict, Optional, Any, Union
 from urllib.parse import urlparse
 from dotenv import load_dotenv
@@ -332,6 +333,144 @@ class PineconeVectorStore:
         text_hash = hashlib.md5(text.encode()).hexdigest()
         return f"{prefix}_{text_hash}" if prefix else text_hash
     
+    def _chunk_text(
+        self,
+        text: str,
+        chunk_size: int = 1000,
+        chunk_overlap: int = 200,
+        strategy: str = "sentence"
+    ) -> List[str]:
+        """
+        Chunk text into smaller pieces for better embedding and retrieval
+        
+        Args:
+            text: Text to chunk
+            chunk_size: Maximum characters per chunk
+            chunk_overlap: Number of characters to overlap between chunks
+            strategy: Chunking strategy ('sentence', 'paragraph', 'fixed')
+        
+        Returns:
+            List of text chunks
+        """
+        if len(text) <= chunk_size:
+            return [text]
+        
+        if strategy == "paragraph":
+            return self._chunk_by_paragraph(text, chunk_size, chunk_overlap)
+        elif strategy == "sentence":
+            return self._chunk_by_sentence(text, chunk_size, chunk_overlap)
+        else:  # fixed
+            return self._chunk_fixed(text, chunk_size, chunk_overlap)
+    
+    def _chunk_by_paragraph(self, text: str, chunk_size: int, overlap: int) -> List[str]:
+        """Chunk text by paragraphs (better for structured documents)"""
+        paragraphs = text.split('\n\n')
+        chunks = []
+        current_chunk = ""
+        
+        for para in paragraphs:
+            para = para.strip()
+            if not para:
+                continue
+            
+            # If adding this paragraph would exceed chunk size
+            if len(current_chunk) + len(para) + 2 > chunk_size:
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+                    # Start new chunk with overlap
+                    if overlap > 0 and len(current_chunk) > overlap:
+                        current_chunk = current_chunk[-overlap:] + "\n\n" + para
+                    else:
+                        current_chunk = para
+                else:
+                    # Paragraph itself is too long, split it by sentence
+                    sub_chunks = self._chunk_by_sentence(para, chunk_size, overlap)
+                    chunks.extend(sub_chunks[:-1])
+                    current_chunk = sub_chunks[-1] if sub_chunks else para
+            else:
+                if current_chunk:
+                    current_chunk += "\n\n" + para
+                else:
+                    current_chunk = para
+        
+        if current_chunk:
+            chunks.append(current_chunk.strip())
+        
+        return chunks
+    
+    def _chunk_by_sentence(self, text: str, chunk_size: int, overlap: int) -> List[str]:
+        """Chunk text by sentences (better for natural language)"""
+        import re
+        
+        # Split by sentence endings (more comprehensive pattern)
+        sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z])', text)
+        chunks = []
+        current_chunk = ""
+        
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+            
+            # If adding this sentence would exceed chunk size
+            if len(current_chunk) + len(sentence) + 1 > chunk_size:
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+                    # Start new chunk with overlap
+                    if overlap > 0 and len(current_chunk) > overlap:
+                        # Get last few sentences for overlap
+                        overlap_text = current_chunk[-overlap:]
+                        current_chunk = overlap_text + " " + sentence
+                    else:
+                        current_chunk = sentence
+                else:
+                    # Sentence itself is too long, split it
+                    chunks.append(sentence[:chunk_size])
+                    current_chunk = sentence[chunk_size - overlap:] if len(sentence) > chunk_size - overlap else sentence
+            else:
+                if current_chunk:
+                    current_chunk += " " + sentence
+                else:
+                    current_chunk = sentence
+        
+        if current_chunk:
+            chunks.append(current_chunk.strip())
+        
+        return chunks
+    
+    def _chunk_fixed(self, text: str, chunk_size: int, overlap: int) -> List[str]:
+        """Chunk text with fixed size (simple sliding window with sentence boundary preference)"""
+        chunks = []
+        start = 0
+        
+        while start < len(text):
+            end = start + chunk_size
+            chunk = text[start:end]
+            
+            # Try to break at sentence boundary
+            if end < len(text):
+                sentence_end = max(
+                    chunk.rfind('. '),
+                    chunk.rfind('.\n'),
+                    chunk.rfind('? '),
+                    chunk.rfind('! '),
+                    chunk.rfind('\n\n'),
+                    chunk.rfind('\n')
+                )
+                
+                if sentence_end > chunk_size * 0.5:  # If we find a break in second half
+                    chunk = chunk[:sentence_end + 1]
+                    end = start + len(chunk)
+            
+            chunks.append(chunk.strip())
+            
+            # Move start position with overlap
+            start = end - overlap
+            if start >= len(text):
+                break
+        
+        return chunks
+    
     # ==================== KNOWLEDGE BASE (kb) NAMESPACE ====================
     
     def add_cpt_code(
@@ -545,8 +684,12 @@ class PineconeVectorStore:
         doc_type: str,
         doc_id: str,
         text: str,
-        metadata: Optional[Dict[str, Any]] = None
-    ) -> str:
+        metadata: Optional[Dict[str, Any]] = None,
+        chunk_text: bool = True,
+        chunk_size: int = 1000,
+        chunk_overlap: int = 200,
+        chunk_strategy: str = "sentence"
+    ) -> Union[str, List[str]]:
         """
         Add user-specific document to private namespace
         
@@ -556,33 +699,56 @@ class PineconeVectorStore:
             doc_id: Document identifier
             text: Document text content
             metadata: Additional metadata (will be merged with required metadata)
+            chunk_text: Whether to chunk the text (default: True)
+            chunk_size: Maximum characters per chunk (default: 1000)
+            chunk_overlap: Characters to overlap between chunks (default: 200)
+            chunk_strategy: Chunking strategy - 'sentence', 'paragraph', or 'fixed' (default: 'sentence')
         
         Returns:
-            Vector ID
+            Vector ID (if not chunked) or List of vector IDs (if chunked)
         """
-        embedding = self._get_embedding(text)
-        vector_id = self._generate_id(f"{user_id}_{doc_type}_{doc_id}_{text}", "doc")
+        # If text is short or chunking is disabled, store as single vector
+        if not chunk_text or len(text) <= chunk_size:
+            embedding = self._get_embedding(text)
+            vector_id = self._generate_id(f"{user_id}_{doc_type}_{doc_id}_{text}", "doc")
+            
+            # CRITICAL: Every vector must be tagged with owner and type
+            metadata_dict = {
+                "user_id": user_id,
+                "doc_type": doc_type,
+                "doc_id": doc_id,
+                "text": text
+            }
+            if metadata:
+                metadata_dict.update(metadata)
+            
+            self.index.upsert(
+                vectors=[{
+                    "id": vector_id,
+                    "values": embedding,
+                    "metadata": metadata_dict
+                }],
+                namespace=self.NAMESPACE_PRIVATE
+            )
+            
+            return vector_id
         
-        # CRITICAL: Every vector must be tagged with owner and type
-        metadata_dict = {
-            "user_id": user_id,
-            "doc_type": doc_type,
-            "doc_id": doc_id,
-            "text": text
-        }
-        if metadata:
-            metadata_dict.update(metadata)
-        
-        self.index.upsert(
-            vectors=[{
-                "id": vector_id,
-                "values": embedding,
-                "metadata": metadata_dict
-            }],
-            namespace=self.NAMESPACE_PRIVATE
+        # Chunk the text for better retrieval
+        chunks = self._chunk_text(
+            text, 
+            chunk_size=chunk_size, 
+            chunk_overlap=chunk_overlap,
+            strategy=chunk_strategy
         )
         
-        return vector_id
+        # Use the existing chunk method
+        return self.add_user_document_chunks(
+            user_id=user_id,
+            doc_type=doc_type,
+            doc_id=doc_id,
+            chunks=chunks,
+            metadata=metadata
+        )
     
     def add_user_document_chunks(
         self,

@@ -21,12 +21,19 @@ This system uses Pinecone (direct API) for vector storage with Azure AI Foundry 
 ### Installation
 
 ```bash
+# Install Python dependencies
+cd backend
 pip install -r requirements.txt
+
+# Or from root directory
+pip install -r backend/requirements.txt
 ```
+
+**Note**: For PDF processing, you may need to install system dependencies. See `backend/INSTALLATION.md` for details.
 
 ### Configuration
 
-Create a `.env` file in your project root:
+Create a `.env` file in your project root (same directory as `package.json`):
 
 ```env
 # Pinecone (Direct API - uses default project)
