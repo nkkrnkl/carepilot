@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +12,8 @@ import {
   AlertCircle,
   Clock,
   MapPin,
-  Video
+  Video,
+  Loader2
 } from "lucide-react";
 import { ProviderCard, Provider, Slot } from "@/components/scheduling/provider-card";
 import { SearchFilters, FilterState } from "@/components/scheduling/search-filters";
@@ -99,17 +100,73 @@ const mockProviders: Provider[] = [
 ];
 
 export default function SchedulingPage() {
-  const [providers, setProviders] = useState(mockProviders);
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
 
-  const handleSearch = (query: string, filters: FilterState) => {
-    // In a real app, this would call the API
-    console.log("Searching with:", { query, filters });
-    // Filter providers based on search criteria
-    setProviders(mockProviders);
+  // Fetch providers from API
+  useEffect(() => {
+    async function fetchProviders() {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const response = await fetch('/api/doctors');
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+          setProviders(result.data);
+        } else {
+          // Fallback to mock data if API fails
+          console.warn("API returned no data, using mock providers");
+          setProviders(mockProviders);
+        }
+      } catch (err) {
+        console.error("Error fetching providers:", err);
+        setError("Failed to load providers. Using mock data.");
+        // Fallback to mock data on error
+        setProviders(mockProviders);
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    fetchProviders();
+  }, []);
+
+  const handleSearch = async (query: string, filters: FilterState) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Build query parameters
+      const params = new URLSearchParams();
+      if (query) params.append('search', query);
+      if (filters.telehealth) params.append('telehealth', 'true');
+      if (filters.language) params.append('language', filters.language);
+      // Note: FilterState may not have specialty, so we skip it for now
+      
+      const response = await fetch(`/api/doctors?${params.toString()}`);
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        setProviders(result.data);
+      } else {
+        // Fallback to mock data
+        console.warn("API search returned no data, using mock providers");
+        setProviders(mockProviders);
+      }
+    } catch (err) {
+      console.error("Error searching providers:", err);
+      setError("Search failed. Using mock data.");
+      setProviders(mockProviders);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSelectSlot = (providerId: string, slotId: string) => {
