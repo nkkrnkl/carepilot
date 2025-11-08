@@ -1,56 +1,132 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
   Calendar,
-  MapPin,
-  Clock,
-  Bell,
-  CheckCircle2,
   ArrowLeft,
-  Search,
-  CalendarCheck
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  MapPin,
+  Video
 } from "lucide-react";
+import { ProviderCard, Provider, Slot } from "@/components/scheduling/provider-card";
+import { SearchFilters, FilterState } from "@/components/scheduling/search-filters";
+import { BookingDrawer } from "@/components/scheduling/booking-drawer";
 
-const capabilities = [
+// Mock data
+const mockProviders: Provider[] = [
   {
-    title: "Find In-Network Options",
-    description: "Search and filter providers based on your insurance network coverage to avoid surprise bills.",
-    icon: Search
+    id: "1",
+    name: "Dr. Sarah Martinez",
+    specialty: "Endocrinology",
+    address: "123 Medical Center Dr, Cambridge, MA 02139",
+    distance: "2.3 miles",
+    travelTime: "12 min drive",
+    languages: ["English", "Spanish"],
+    telehealth: true,
+    inNetwork: true,
+    rating: 4.8,
+    slots: [
+      { id: "1-1", date: "Tue, Nov 12", time: "9:30 AM", available: true, mode: "telehealth" as const },
+      { id: "1-2", date: "Tue, Nov 12", time: "2:00 PM", available: true, mode: "in-person" as const },
+      { id: "1-3", date: "Wed, Nov 13", time: "10:00 AM", available: true, mode: "telehealth" as const },
+      { id: "1-4", date: "Thu, Nov 14", time: "8:30 AM", available: true, mode: "in-person" as const },
+    ],
+    reasons: [
+      "In-network with your plan",
+      "12 min drive from your location",
+      "Spanish-speaking provider",
+      "Available next week"
+    ],
+    estimatedCost: 45
   },
   {
-    title: "Match Availability",
-    description: "See real-time availability across providers and find appointments that fit your schedule.",
-    icon: Clock
+    id: "2",
+    name: "Dr. Michael Chen",
+    specialty: "Endocrinology",
+    address: "456 Healthcare Ave, Boston, MA 02115",
+    distance: "4.1 miles",
+    travelTime: "18 min drive",
+    languages: ["English", "Chinese"],
+    telehealth: true,
+    inNetwork: true,
+    rating: 4.9,
+    slots: [
+      { id: "2-1", date: "Mon, Nov 11", time: "11:00 AM", available: true, mode: "telehealth" as const },
+      { id: "2-2", date: "Tue, Nov 12", time: "3:30 PM", available: true, mode: "in-person" as const },
+      { id: "2-3", date: "Wed, Nov 13", time: "9:00 AM", available: true, mode: "telehealth" as const },
+    ],
+    reasons: [
+      "In-network with your plan",
+      "High patient ratings",
+      "Telehealth available",
+      "Early morning slots"
+    ],
+    estimatedCost: 50
   },
   {
-    title: "Location Matching",
-    description: "Filter providers by location, distance, and convenience to find the best options near you.",
-    icon: MapPin
+    id: "3",
+    name: "Dr. Emily Rodriguez",
+    specialty: "Endocrinology",
+    address: "789 Wellness St, Cambridge, MA 02140",
+    distance: "3.5 miles",
+    travelTime: "15 min drive",
+    languages: ["English", "Spanish"],
+    telehealth: false,
+    inNetwork: true,
+    rating: 4.7,
+    slots: [
+      { id: "3-1", date: "Tue, Nov 12", time: "8:00 AM", available: true, mode: "in-person" as const },
+      { id: "3-2", date: "Wed, Nov 13", time: "1:30 PM", available: true, mode: "in-person" as const },
+      { id: "3-3", date: "Thu, Nov 14", time: "10:30 AM", available: true, mode: "in-person" as const },
+    ],
+    reasons: [
+      "In-network with your plan",
+      "Closest to your location",
+      "Spanish-speaking provider",
+      "Morning availability"
+    ],
+    estimatedCost: 40
   },
-  {
-    title: "Place Appointments",
-    description: "Schedule appointments directly through CarePilot with automatic confirmation and calendar sync.",
-    icon: CalendarCheck
-  },
-  {
-    title: "Confirm Appointments",
-    description: "Receive automatic confirmations and reminders to ensure you never miss an appointment.",
-    icon: CheckCircle2
-  },
-  {
-    title: "Prep Reminders",
-    description: "Get intelligent reminders for appointment preparation, including fasting requirements and documents needed.",
-    icon: Bell
-  }
 ];
 
 export default function SchedulingPage() {
+  const [providers, setProviders] = useState(mockProviders);
+  const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+  const [isBookingOpen, setIsBookingOpen] = useState(false);
+  const [isConfirmed, setIsConfirmed] = useState(false);
+
+  const handleSearch = (query: string, filters: FilterState) => {
+    // In a real app, this would call the API
+    console.log("Searching with:", { query, filters });
+    // Filter providers based on search criteria
+    setProviders(mockProviders);
+  };
+
+  const handleSelectSlot = (providerId: string, slotId: string) => {
+    setSelectedProvider(providerId);
+    setSelectedSlot(slotId);
+    setIsBookingOpen(true);
+  };
+
+  const handleConfirmBooking = () => {
+    setIsConfirmed(true);
+    setIsBookingOpen(false);
+    // In a real app, this would call the booking API
+    setTimeout(() => setIsConfirmed(false), 5000);
+  };
+
+  const selectedProviderData = providers.find(p => p.id === selectedProvider);
+  const selectedSlotData = selectedProviderData?.slots.find(s => s.id === selectedSlot);
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+    <div className="min-h-screen bg-gray-50">
       {/* Navigation */}
       <nav className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -74,129 +150,144 @@ export default function SchedulingPage() {
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="text-center mb-12">
+      {/* Success Banner */}
+      {isConfirmed && (
+        <div className="bg-green-50 border-b border-green-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex items-center gap-2 text-green-800">
+              <CheckCircle2 className="h-5 w-5" />
+              <span className="font-medium">Appointment confirmed! Check your email for details.</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Hero Section */}
+        <div className="mb-8">
           <Badge className="mb-4 bg-green-100 text-green-700">Feature</Badge>
-          <h1 className="text-5xl font-bold text-gray-900 mb-6">
-            Scheduling
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+            Book Your Appointment
           </h1>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-            Find in-network options, match availability and location, place and confirm appointments, and set prep reminders. 
-            Streamline your healthcare scheduling with intelligent automation that saves you time and ensures you get the care you need.
+          <p className="text-lg text-gray-600 max-w-3xl">
+            Find in-network clinicians that match your schedule, language, and location. 
+            We'll show you 3-5 best options with cost estimates and let you book in one tap.
           </p>
         </div>
 
-        {/* Key Features */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
-          {capabilities.map((capability, index) => {
-            const Icon = capability.icon;
-            return (
-              <Card key={index} className="border-2 hover:border-green-300 transition-all">
-                <CardHeader>
-                  <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center mb-3">
-                    <Icon className="h-5 w-5 text-green-600" />
-                  </div>
-                  <CardTitle className="text-lg font-semibold">{capability.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <CardDescription className="text-gray-600">
-                    {capability.description}
-                  </CardDescription>
-                </CardContent>
-              </Card>
-            );
-          })}
+        {/* Search and Filters */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Search for Appointments</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <SearchFilters onSearch={handleSearch} />
+          </CardContent>
+        </Card>
+
+        {/* Results */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-gray-900">
+              {providers.length} Providers Found
+            </h2>
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <AlertCircle className="h-4 w-4" />
+              <span>All providers are in-network</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Provider Cards */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {providers.map((provider) => (
+            <ProviderCard
+              key={provider.id}
+              provider={provider}
+              onSelectSlot={handleSelectSlot}
+              selectedSlotId={selectedSlot === provider.id ? selectedSlot : undefined}
+            />
+          ))}
         </div>
 
         {/* How It Works */}
-        <Card className="border-2 border-green-200 bg-green-50/50 mb-16">
+        <Card className="border-2 border-green-200 bg-green-50/50 mb-8">
           <CardHeader>
             <CardTitle className="text-2xl font-bold text-gray-900">How It Works</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="flex gap-4">
-                <div className="flex-shrink-0">
-                  <div className="h-8 w-8 rounded-full bg-green-600 text-white flex items-center justify-center font-bold">
-                    1
-                  </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <div className="h-12 w-12 rounded-full bg-green-600 text-white flex items-center justify-center font-bold text-xl mb-3">
+                  1
                 </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">Search In-Network Providers</h3>
-                  <p className="text-gray-600">
-                    Enter your specialty, location, and insurance information. CarePilot finds all in-network providers 
-                    that match your criteria.
-                  </p>
-                </div>
+                <h3 className="font-semibold text-gray-900 mb-2">Search & Filter</h3>
+                <p className="text-sm text-gray-600">
+                  Enter your needs, location, and preferences. We'll find in-network providers that match.
+                </p>
               </div>
-              <div className="flex gap-4">
-                <div className="flex-shrink-0">
-                  <div className="h-8 w-8 rounded-full bg-green-600 text-white flex items-center justify-center font-bold">
-                    2
-                  </div>
+              <div>
+                <div className="h-12 w-12 rounded-full bg-green-600 text-white flex items-center justify-center font-bold text-xl mb-3">
+                  2
                 </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">Match Availability & Location</h3>
-                  <p className="text-gray-600">
-                    View real-time availability and filter by distance, convenience, and your preferred times. 
-                    See all options in one place.
-                  </p>
-                </div>
+                <h3 className="font-semibold text-gray-900 mb-2">Review Options</h3>
+                <p className="text-sm text-gray-600">
+                  See 3-5 ranked options with cost estimates, travel time, and reason codes.
+                </p>
               </div>
-              <div className="flex gap-4">
-                <div className="flex-shrink-0">
-                  <div className="h-8 w-8 rounded-full bg-green-600 text-white flex items-center justify-center font-bold">
-                    3
-                  </div>
+              <div>
+                <div className="h-12 w-12 rounded-full bg-green-600 text-white flex items-center justify-center font-bold text-xl mb-3">
+                  3
                 </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">Schedule & Set Reminders</h3>
-                  <p className="text-gray-600">
-                    Place appointments with automatic confirmation. Receive prep reminders including fasting requirements, 
-                    documents needed, and preparation instructions.
-                  </p>
-                </div>
+                <h3 className="font-semibold text-gray-900 mb-2">Book & Confirm</h3>
+                <p className="text-sm text-gray-600">
+                  Select a slot, confirm your appointment, and receive prep instructions and reminders.
+                </p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Benefits */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="border-2">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold">Time Savings</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-600">
-                No more calling multiple offices or checking multiple websites. Find and schedule appointments in minutes.
-              </p>
-            </CardContent>
-          </Card>
-          <Card className="border-2">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold">Cost Savings</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-600">
-                Always stay in-network to avoid surprise bills and ensure your insurance covers your appointments.
-              </p>
-            </CardContent>
-          </Card>
-          <Card className="border-2">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold">Never Miss</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-600">
-                Automated reminders and calendar sync ensure you're always prepared and never miss an important appointment.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
+        {/* Safety Note */}
+        <Card className="bg-blue-50 border-blue-200">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
+              <div>
+                <p className="font-semibold text-blue-900 mb-1">Safety Note</p>
+                <p className="text-sm text-blue-800">
+                  Informational support only. Final bookings and prep are user-approved. 
+                  We don't replace your providers or portals—we coordinate with them.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Booking Drawer */}
+      {selectedProviderData && selectedSlotData && (
+        <BookingDrawer
+          isOpen={isBookingOpen}
+          onClose={() => {
+            setIsBookingOpen(false);
+            setSelectedProvider(null);
+            setSelectedSlot(null);
+          }}
+          provider={{
+            name: selectedProviderData.name,
+            specialty: selectedProviderData.specialty,
+            address: selectedProviderData.address,
+            slot: {
+              date: selectedSlotData.date,
+              time: selectedSlotData.time,
+              mode: selectedSlotData.mode,
+            },
+            estimatedCost: selectedProviderData.estimatedCost,
+          }}
+          onConfirm={handleConfirmBooking}
+        />
+      )}
     </div>
   );
 }
-
