@@ -1,7 +1,5 @@
 import { 
   Beaker,
-  Calendar,
-  Receipt,
   FileText,
   LucideIcon,
   Stethoscope,
@@ -27,27 +25,11 @@ export const FEATURES: Feature[] = [
     color: "bg-blue-100 text-blue-600"
   },
   {
-    id: "scheduling",
-    title: "Scheduling",
-    description: "Find in-network options, match availability and location, place and confirm appointments, and set prep reminders.",
-    icon: Calendar,
-    link: "/features/scheduling",
-    color: "bg-green-100 text-green-600"
-  },
-  {
-    id: "bill-negotiation",
-    title: "Bill Negotiation",
-    description: "Read bills and EOBs, detect discrepancies, estimate the right price, draft negotiation emails, and track outcomes.",
-    icon: Receipt,
-    link: "/features/bill-negotiation",
-    color: "bg-orange-100 text-orange-600"
-  },
-  {
-    id: "claims",
-    title: "Claims",
-    description: "Pre-check coverage, assemble codes (CPT/ICD-10), generate clean claims and appeals, and monitor status.",
+    id: "cases",
+    title: "Case Management",
+    description: "Track and manage all your bills, EOBs, and claims in one place. Review cases, track progress, and take action when needed.",
     icon: FileText,
-    link: "/features/claims",
+    link: "/features/cases",
     color: "bg-purple-100 text-purple-600"
   }
 ] as const;
@@ -69,9 +51,7 @@ export const ROUTES = {
   OVERVIEW: "/overview",
   FEATURES: {
     LAB_ANALYSIS: "/features/lab-analysis",
-    SCHEDULING: "/features/scheduling",
-    BILL_NEGOTIATION: "/features/bill-negotiation",
-    CLAIMS: "/features/claims"
+    CASES: "/features/cases"
   }
 } as const;
 

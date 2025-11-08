@@ -5,9 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { 
   Beaker,
-  Calendar,
   FileText,
-  Receipt,
   ArrowRight
 } from "lucide-react";
 
@@ -16,25 +14,13 @@ const features = [
     title: "Lab Analysis",
     description: "Parse complex lab results with AI precision, extracting key metrics and flagging anomalies instantly. Identify trends across multiple tests over time, revealing patterns that might go unnoticed. Translate medical jargon into plain-English context that's easy to understand. Get actionable insights that help you understand your health metrics at a glance, with historical comparisons and expert-level interpretation. Track progress, set health goals, and receive personalized recommendations based on your unique test results.",
     icon: Beaker,
-    link: "#lab-demo"
+    link: "/features/lab-analysis"
   },
   {
-    title: "Scheduling",
-    description: "Navigate in-network providers effortlessly with a comprehensive database of healthcare professionals. Find available appointments that fit your schedule with real-time availability updates across multiple providers. Receive intelligent reminders for upcoming visits, prescription renewals, and follow-ups tailored to your preferences. Coordinate multiple appointments efficiently, avoiding scheduling conflicts. Never miss an important medical appointment again with automated calendar synchronization and smart notification systems.",
-    icon: Calendar,
-    link: "#scheduling-demo"
-  },
-  {
-    title: "Bill Negotiation",
-    description: "Automatically detect billing discrepancies and overcharges by comparing your medical bills against industry standards and historical pricing data. Get the right price for medical services with data-driven negotiation support that provides evidence-based arguments. Review pre-drafted dispute letters and appeals before submission, customized to your specific situation. Track negotiation progress and outcomes, learning what works best for different types of charges. Save time and money on healthcare costs while ensuring you're not overpaying.",
-    icon: Receipt,
-    link: "#bill-demo"
-  },
-  {
-    title: "Claims",
-    description: "Pre-check claims for accuracy before submission to avoid rejections and delays. Verify that all required information is complete and correctly formatted according to your insurance provider's requirements. Ensure clean claims that get processed quickly on first submission, reducing administrative burden. Handle appeals efficiently with automated status tracking and deadline reminders. Stay informed about every step of your insurance claims process with real-time updates and detailed explanations of any issues that arise.",
+    title: "Case Management",
+    description: "Track and manage all your bills, EOBs, and claims in one place. Review cases, track progress, and take action when needed. View relevant documents, audit trails, and next steps for each case. Pay bills or appeal claims with a single click. Get alerts for high amounts, overdue payments, and discrepancies. Monitor case status in real-time with detailed timelines and automated follow-ups.",
     icon: FileText,
-    link: "#claims-demo"
+    link: "/features/cases"
   }
 ];
 
@@ -55,15 +41,15 @@ export default function Overview() {
           
           {/* CarePilot Description */}
           <p className="text-lg text-gray-700 leading-relaxed max-w-4xl">
-            CarePilot is an AI agent handling four high-leverage tasks that streamline your healthcare experience. 
-            From analyzing lab results and managing appointments to negotiating bills and processing claims, CarePilot 
+            CarePilot is an AI agent handling key healthcare tasks that streamline your experience. 
+            From analyzing lab results to managing bills, EOBs, and claims, CarePilot 
             automates the complex, time-consuming aspects of healthcare administration. Every action is fully auditable 
             and requires user approval, ensuring you maintain complete control while benefiting from intelligent automation.
           </p>
         </div>
 
-        {/* Four Pillars */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Features */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
           {features.map((feature, index) => {
             const Icon = feature.icon;
             return (
@@ -84,7 +70,7 @@ export default function Overview() {
                   </CardDescription>
                   <Button asChild variant="link" className="p-0 h-auto font-medium text-blue-600 hover:text-blue-700">
                     <Link href={feature.link} className="flex items-center gap-1">
-                      See it in demo
+                      Explore feature
                       <ArrowRight className="h-4 w-4" />
                     </Link>
                   </Button>
