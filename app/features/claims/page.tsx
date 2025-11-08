@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +16,8 @@ import {
   Clock,
   AlertCircle
 } from "lucide-react";
+import { DocumentUpload } from "@/components/claims/document-upload";
+import { ClaimForm } from "@/components/claims/claim-form";
 
 const capabilities = [
   {
@@ -50,6 +53,10 @@ const capabilities = [
 ];
 
 export default function ClaimsPage() {
+  const [userId] = useState("user-123"); // In production, get from auth
+  const [uploadedDocs, setUploadedDocs] = useState<Array<{ id: string; type: string; name: string }>>([]);
+  const [activeTab, setActiveTab] = useState<"upload" | "process">("upload");
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       {/* Navigation */}
@@ -87,6 +94,44 @@ export default function ClaimsPage() {
             Streamline your insurance claims process with automated error checking and real-time tracking.
           </p>
         </div>
+
+        {/* Tab Navigation */}
+        <div className="flex gap-2 mb-8 border-b">
+          <Button
+            variant={activeTab === "upload" ? "default" : "ghost"}
+            onClick={() => setActiveTab("upload")}
+            className="rounded-b-none"
+          >
+            Upload Documents
+          </Button>
+          <Button
+            variant={activeTab === "process" ? "default" : "ghost"}
+            onClick={() => setActiveTab("process")}
+            className="rounded-b-none"
+          >
+            Process Claim
+          </Button>
+        </div>
+
+        {/* Tab Content */}
+        {activeTab === "upload" && (
+          <DocumentUpload
+            userId={userId}
+            onUploadComplete={(files) => {
+              setUploadedDocs(
+                files.map((f) => ({
+                  id: f.id,
+                  type: f.type,
+                  name: f.file.name,
+                }))
+              );
+            }}
+          />
+        )}
+
+        {activeTab === "process" && (
+          <ClaimForm userId={userId} uploadedDocuments={uploadedDocs} />
+        )}
 
         {/* Key Features */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">

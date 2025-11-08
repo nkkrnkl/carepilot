@@ -1,12 +1,8 @@
-# CarePilot Python Dependencies
+# Python dependencies have been moved to backend/requirements.txt
 # 
-# Install with: pip install -r requirements.txt
-# For development: pip install -r requirements-dev.txt (if available)
-
-# HTTP library for making API requests
-# Used by api.py for K2 Think LLM API client
-requests>=2.31.0,<3.0.0
-
-# Environment variable management
-# Used to load API keys and configuration from .env files
-python-dotenv>=1.0.0,<2.0.0
+# To install dependencies:
+# cd backend
+# pip install -r requirements.txt
+#
+# Or from the root directory:
+# pip install -r backend/requirements.txt
