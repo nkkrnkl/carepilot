@@ -1,12 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UploadDropzone } from "@/components/labs/UploadDropzone";
 import { PreviousReports } from "@/components/labs/PreviousReports";
 import { CurrentDataCards } from "@/components/labs/CurrentDataCards";
 import { PastVisitsCharts } from "@/components/labs/PastVisitsCharts";
 import { Toaster, toast } from "sonner";
+import { ArrowLeft, FlaskConical } from "lucide-react";
 
 interface LabReport {
   id: string;
@@ -70,8 +73,20 @@ export default function LabsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-4">
-              <h1 className="text-xl font-bold text-gray-900">Lab Report Ingest + Timeline</h1>
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/" className="flex items-center gap-2">
+                  <ArrowLeft className="h-4 w-4" />
+                  Back
+                </Link>
+              </Button>
+              <div className="flex items-center gap-2">
+                <FlaskConical className="h-6 w-6 text-blue-600" />
+                <span className="text-xl font-bold text-gray-900">Lab Analysis</span>
+              </div>
             </div>
+            <Button asChild variant="outline">
+              <Link href="/">Home</Link>
+            </Button>
           </div>
         </div>
       </nav>

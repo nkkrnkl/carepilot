@@ -79,13 +79,23 @@ def main():
         )
         
         # Check if workflow completed successfully
-        if not result.get("workflow_completed", False):
-            error = result.get("error", "Unknown error")
-            raise Exception(f"Workflow failed: {error}")
+        workflow_completed = result.get("workflow_completed", False)
+        has_parameters = result.get("has_parameters", False)
+        parsing_failed = result.get("parsing_failed", False)
+        error = result.get("error")
+        
+        # Validate that we actually extracted parameters
+        parameters = result.get("parameters", [])
+        if not workflow_completed or parsing_failed or not has_parameters or len(parameters) == 0:
+            error_msg = error or "Failed to extract lab parameters"
+            if parsing_failed:
+                error_msg = "Lab parameter parsing failed - no parameters extracted"
+            elif len(parameters) == 0:
+                error_msg = "No lab parameters found in the document"
+            raise Exception(f"Workflow failed: {error_msg}")
         
         # Extract results
         lab_metadata = result.get("lab_metadata", {})
-        parameters = result.get("parameters", [])
         vector_id = result.get("vector_id")
         chunk_count = result.get("chunk_count", 0)
         

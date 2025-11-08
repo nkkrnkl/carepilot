@@ -23,6 +23,134 @@ interface CurrentDataCardsProps {
   report: LabReport | null;
 }
 
+type ParameterStatus = "normal" | "low" | "high" | "unknown";
+
+/**
+ * Parse reference range string and determine parameter status
+ * Handles formats like: "0.6-1.2", "70-100", "< 5.0", "> 10.0", etc.
+ */
+function parseReferenceRange(rangeStr: string): { min: number | null; max: number | null } | null {
+  if (!rangeStr) return null;
+  
+  // Remove common prefixes and clean the string
+  let cleaned = rangeStr.trim().replace(/^(range|ref|reference):?\s*/i, "");
+  
+  // Handle "< value" format (upper limit only)
+  const lessThanMatch = cleaned.match(/^<\s*([\d.]+)/i);
+  if (lessThanMatch) {
+    return { min: null, max: parseFloat(lessThanMatch[1]) };
+  }
+  
+  // Handle "> value" format (lower limit only)
+  const greaterThanMatch = cleaned.match(/^>\s*([\d.]+)/i);
+  if (greaterThanMatch) {
+    return { min: parseFloat(greaterThanMatch[1]), max: null };
+  }
+  
+  // Handle "value1 - value2" or "value1-value2" format
+  const rangeMatch = cleaned.match(/([\d.]+)\s*[-–—]\s*([\d.]+)/);
+  if (rangeMatch) {
+    return {
+      min: parseFloat(rangeMatch[1]),
+      max: parseFloat(rangeMatch[2])
+    };
+  }
+  
+  // Try to extract numbers if format is unclear
+  const numbers = cleaned.match(/[\d.]+/g);
+  if (numbers && numbers.length >= 2) {
+    const nums = numbers.map(n => parseFloat(n)).sort((a, b) => a - b);
+    return { min: nums[0], max: nums[nums.length - 1] };
+  }
+  
+  return null;
+}
+
+/**
+ * Determine if a parameter value is within, above, or below the reference range
+ */
+function getParameterStatus(
+  value: string | number,
+  referenceRange: string | null | undefined
+): ParameterStatus {
+  if (!referenceRange) return "unknown";
+  
+  const numValue = typeof value === "string" ? parseFloat(value) : value;
+  if (isNaN(numValue)) return "unknown";
+  
+  const range = parseReferenceRange(referenceRange);
+  if (!range) return "unknown";
+  
+  if (range.min !== null && range.max !== null) {
+    // Full range: check if within bounds
+    if (numValue >= range.min && numValue <= range.max) {
+      return "normal";
+    } else if (numValue < range.min) {
+      return "low";
+    } else {
+      return "high";
+    }
+  } else if (range.min !== null) {
+    // Only lower limit: check if above
+    return numValue >= range.min ? "normal" : "low";
+  } else if (range.max !== null) {
+    // Only upper limit: check if below
+    return numValue <= range.max ? "normal" : "high";
+  }
+  
+  return "unknown";
+}
+
+/**
+ * Get gradient classes based on parameter status
+ */
+function getGradientClasses(status: ParameterStatus): string {
+  switch (status) {
+    case "normal":
+      return "bg-gradient-to-br from-green-50 to-emerald-50 border-green-200 dark:from-green-950/20 dark:to-emerald-950/20 dark:border-green-800";
+    case "low":
+      return "bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200 dark:from-blue-950/20 dark:to-cyan-950/20 dark:border-blue-800";
+    case "high":
+      return "bg-gradient-to-br from-orange-50 to-red-50 border-orange-200 dark:from-orange-950/20 dark:to-red-950/20 dark:border-orange-800";
+    case "unknown":
+    default:
+      return "bg-gradient-to-br from-gray-50 to-slate-50 border-gray-200 dark:from-gray-950/20 dark:to-slate-950/20 dark:border-gray-800";
+  }
+}
+
+/**
+ * Get status badge variant and text
+ */
+function getStatusBadge(status: ParameterStatus): { variant: "default" | "secondary" | "destructive" | "outline"; text: string; className: string } {
+  switch (status) {
+    case "normal":
+      return {
+        variant: "default",
+        text: "Normal",
+        className: "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300"
+      };
+    case "low":
+      return {
+        variant: "secondary",
+        text: "Low",
+        className: "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300"
+      };
+    case "high":
+      return {
+        variant: "destructive",
+        text: "High",
+        className: "bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300"
+      };
+    case "unknown":
+    default:
+      return {
+        variant: "outline",
+        text: "No Range",
+        className: "bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-900/30 dark:text-gray-300"
+      };
+  }
+}
+
 export function CurrentDataCards({ report }: CurrentDataCardsProps) {
   if (!report) {
     return (
@@ -99,26 +227,41 @@ export function CurrentDataCards({ report }: CurrentDataCardsProps) {
         <div>
           <h3 className="text-lg font-semibold mb-4">Parameters</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {parameters.map(([name, param]) => (
-              <Card key={name} className="border-2">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">{name}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-2xl font-bold">{param.value}</span>
-                    {param.unit && <span className="text-sm text-muted-foreground">{param.unit}</span>}
-                  </div>
-                  {param.referenceRange && (
-                    <div className="mt-2">
-                      <Badge variant="outline" className="text-xs">
-                        Range: {param.referenceRange}
+            {parameters.map(([name, param]) => {
+              const status = getParameterStatus(param.value, param.referenceRange);
+              const gradientClasses = getGradientClasses(status);
+              const statusBadge = getStatusBadge(status);
+              
+              return (
+                <Card 
+                  key={name} 
+                  className={`border-2 transition-all duration-200 hover:shadow-md ${gradientClasses}`}
+                >
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">{name}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-baseline gap-2 mb-3">
+                      <span className="text-2xl font-bold">{param.value}</span>
+                      {param.unit && <span className="text-sm text-muted-foreground">{param.unit}</span>}
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      {param.referenceRange && (
+                        <Badge variant="outline" className="text-xs w-fit">
+                          Range: {param.referenceRange}
+                        </Badge>
+                      )}
+                      <Badge 
+                        variant={statusBadge.variant} 
+                        className={`text-xs w-fit ${statusBadge.className}`}
+                      >
+                        {statusBadge.text}
                       </Badge>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </div>
       )}

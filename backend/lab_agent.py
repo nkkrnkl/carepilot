@@ -355,13 +355,23 @@ Please provide your response in the exact JSON format specified."""
             if not extracted_text:
                 raise ValueError("No extracted text available from Step 1")
             
-            # Use LLM to parse lab parameters
+            # Use LLM to parse lab parameters with retry logic
+            # Increase text limit but be smart about it
+            text_limit = 8000  # Increased from 3000 for better parsing
+            text_to_parse = extracted_text[:text_limit] if len(extracted_text) > text_limit else extracted_text
+            
+            if len(extracted_text) > text_limit:
+                # Add note that text was truncated
+                text_to_parse += f"\n\n[Note: Text truncated from {len(extracted_text)} to {text_limit} characters. Please extract all parameters visible above.]"
+            
             user_message = f"""Based on the extracted text from the lab report, complete Step 2: Parse Lab Parameters.
 
 **Extracted Text:**
-{extracted_text[:3000]}  # Limit to first 3000 chars to avoid token limits
+{text_to_parse}
 
 {STEP_PROMPTS[2]}
+
+CRITICAL: You MUST respond with ONLY valid JSON. Do not include any explanatory text outside the JSON object. The JSON must be complete and well-formed.
 
 Please provide your response in the exact JSON format specified. Extract ALL lab parameters you can find, including their values, units, and reference ranges."""
             
@@ -370,33 +380,86 @@ Please provide your response in the exact JSON format specified. Extract ALL lab
                 {"role": "user", "content": user_message}
             ]
             
-            response = self.llm_client.chat(messages)
+            # Retry logic for parsing
+            max_retries = 2
+            step_result = None
+            last_error = None
+            
+            for attempt in range(max_retries):
+                try:
+                    response = self.llm_client.chat(messages)
+                    
+                    if not response or "choices" not in response:
+                        last_error = "No response from LLM"
+                        if attempt < max_retries - 1:
+                            continue
+                        break
+                    
+                    content = response["choices"][0]["message"]["content"]
+                    
+                    # Log the raw response for debugging (first 500 chars)
+                    if attempt == 0:
+                        print(f"[LabAgent] Step 2 LLM response (first 500 chars): {content[:500]}")
+                    
+                    step_result = self._extract_json_from_response(content)
+                    
+                    if step_result:
+                        # Validate the extracted result
+                        if not isinstance(step_result, dict):
+                            last_error = f"Step result is not a dict: {type(step_result)}"
+                            if attempt < max_retries - 1:
+                                continue
+                            break
+                        
+                        # Validate parameters structure
+                        parameters = step_result.get("parameters", [])
+                        if parameters and not isinstance(parameters, list):
+                            last_error = f"Parameters is not a list: {type(parameters)}"
+                            if attempt < max_retries - 1:
+                                continue
+                            break
+                        
+                        # Success - break out of retry loop
+                        break
+                    else:
+                        last_error = "Failed to extract JSON from response"
+                        if attempt < max_retries - 1:
+                            # Add more explicit instruction for retry
+                            messages.append({
+                                "role": "assistant",
+                                "content": content
+                            })
+                            messages.append({
+                                "role": "user",
+                                "content": "Your previous response was not valid JSON. Please respond with ONLY a valid JSON object, no other text. Use this exact format:\n```json\n{...}\n```"
+                            })
+                            continue
+                
+                except Exception as e:
+                    last_error = f"Exception during parsing attempt {attempt + 1}: {str(e)}"
+                    if attempt < max_retries - 1:
+                        continue
+                    break
             
             # Parse LLM response
-            if response and "choices" in response:
-                content = response["choices"][0]["message"]["content"]
-                step_result = self._extract_json_from_response(content)
-                
-                if step_result:
-                    state["step2_parsing"] = step_result
-                    state["lab_parameters"] = step_result.get("parameters", [])
-                    state["lab_metadata"] = step_result.get("lab_metadata", {})
-                else:
-                    # Fallback: try to extract basic structure
-                    state["step2_parsing"] = {
-                        "step": 2,
-                        "status": "Completed",
-                        "lab_metadata": {},
-                        "parameters": [],
-                        "parameter_count": 0
-                    }
-                    state["lab_parameters"] = []
-                    state["lab_metadata"] = {}
+            if step_result:
+                state["step2_parsing"] = step_result
+                state["lab_parameters"] = step_result.get("parameters", [])
+                state["lab_metadata"] = step_result.get("lab_metadata", {})
+                print(f"[LabAgent] Step 2 parsed successfully: {len(state['lab_parameters'])} parameters extracted")
             else:
-                # Fallback response
+                # Log the failure for debugging
+                error_msg = f"Failed to parse lab parameters after {max_retries} attempts"
+                if last_error:
+                    error_msg += f": {last_error}"
+                print(f"[LabAgent] ERROR: {error_msg}")
+                
+                # Don't silently fail - raise an error so it's visible
+                state["error"] = error_msg
                 state["step2_parsing"] = {
                     "step": 2,
-                    "status": "Completed",
+                    "status": "Error",
+                    "error": error_msg,
                     "lab_metadata": {},
                     "parameters": [],
                     "parameter_count": 0
@@ -535,8 +598,16 @@ Please provide your response in the exact JSON format specified."""
                 }
             
             # Compile final result
+            # Check if parsing was successful
+            parsing_result = state.get("step2_parsing", {})
+            has_error = state.get("error") is not None
+            parsing_failed = parsing_result.get("status") == "Error" or len(lab_parameters) == 0
+            
+            # Determine if workflow truly completed successfully
+            workflow_success = not has_error and not parsing_failed and len(lab_parameters) > 0
+            
             state["final_result"] = {
-                "workflow_completed": True,
+                "workflow_completed": workflow_success,
                 "steps": {
                     "step1": state.get("step1_extraction", {}),
                     "step2": state.get("step2_parsing", {}),
@@ -549,7 +620,10 @@ Please provide your response in the exact JSON format specified."""
                 "parameter_count": len(lab_parameters),
                 "pinecone_stored": True,
                 "vector_id": vector_id,
-                "chunk_count": chunk_count
+                "chunk_count": chunk_count,
+                "error": state.get("error"),
+                "parsing_failed": parsing_failed,
+                "has_parameters": len(lab_parameters) > 0
             }
             
             state["current_step"] = 3
@@ -565,19 +639,83 @@ Please provide your response in the exact JSON format specified."""
         return state
     
     def _extract_json_from_response(self, content: str) -> Optional[Dict[str, Any]]:
-        """Extract JSON from LLM response"""
-        try:
-            # Try to find JSON in the response
-            import re
-            json_match = re.search(r'\{.*\}', content, re.DOTALL)
-            if json_match:
-                json_str = json_match.group(0)
-                return json.loads(json_str)
-            else:
-                # Try parsing the entire content as JSON
-                return json.loads(content)
-        except Exception:
+        """
+        Extract JSON from LLM response with robust parsing
+        
+        Handles:
+        - JSON in code blocks (```json ... ```)
+        - Multiple JSON objects
+        - Nested JSON structures
+        - Malformed JSON with recovery
+        """
+        import re
+        
+        if not content or not isinstance(content, str):
             return None
+        
+        # Strategy 1: Try to find JSON in code blocks first
+        code_block_pattern = r'```(?:json)?\s*(\{.*?\})\s*```'
+        code_block_match = re.search(code_block_pattern, content, re.DOTALL)
+        if code_block_match:
+            try:
+                json_str = code_block_match.group(1)
+                return json.loads(json_str)
+            except (json.JSONDecodeError, AttributeError):
+                pass
+        
+        # Strategy 2: Find JSON object with balanced braces (more robust)
+        # Count braces to find the complete JSON object
+        brace_count = 0
+        start_idx = -1
+        
+        for i, char in enumerate(content):
+            if char == '{':
+                if brace_count == 0:
+                    start_idx = i
+                brace_count += 1
+            elif char == '}':
+                brace_count -= 1
+                if brace_count == 0 and start_idx != -1:
+                    # Found complete JSON object
+                    try:
+                        json_str = content[start_idx:i+1]
+                        return json.loads(json_str)
+                    except json.JSONDecodeError:
+                        # Try next JSON object
+                        start_idx = -1
+                        continue
+        
+        # Strategy 3: Try greedy match (fallback)
+        json_match = re.search(r'\{.*\}', content, re.DOTALL)
+        if json_match:
+            try:
+                json_str = json_match.group(0)
+                # Try to fix common issues
+                # Remove trailing commas before closing braces
+                json_str = re.sub(r',\s*}', '}', json_str)
+                json_str = re.sub(r',\s*]', ']', json_str)
+                return json.loads(json_str)
+            except json.JSONDecodeError:
+                pass
+        
+        # Strategy 4: Try parsing entire content
+        try:
+            return json.loads(content.strip())
+        except json.JSONDecodeError:
+            pass
+        
+        # Strategy 5: Try to extract JSON from markdown-style responses
+        # Look for content between first { and last }
+        first_brace = content.find('{')
+        last_brace = content.rfind('}')
+        if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+            try:
+                json_str = content[first_brace:last_brace+1]
+                return json.loads(json_str)
+            except json.JSONDecodeError:
+                pass
+        
+        return None
     
     def process_lab(
         self,
