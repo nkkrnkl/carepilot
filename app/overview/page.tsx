@@ -102,12 +102,14 @@ export default function Overview() {
           
           {/* CarePilot Description */}
           <div className="bg-white/80 backdrop-blur-sm border-2 border-blue-100 rounded-2xl p-6 shadow-lg">
-            <p className="text-lg text-gray-700 leading-relaxed max-w-4xl">
-              CarePilot is an AI agent handling four high-leverage tasks that streamline your healthcare experience. 
-              From analyzing lab results and managing appointments to negotiating bills and processing claims, CarePilot 
-              automates the complex, time-consuming aspects of healthcare administration. Every action is fully auditable 
-              and requires user approval, ensuring you maintain complete control while benefiting from intelligent automation.
-            </p>
+            <div className="max-w-4xl">
+              <p className="text-lg text-gray-700 leading-relaxed text-left">
+                CarePilot is an AI agent handling four high-leverage tasks that streamline your healthcare experience. 
+                From analyzing lab results and managing appointments to negotiating bills and processing claims, CarePilot 
+                automates the complex, time-consuming aspects of healthcare administration. Every action is fully auditable 
+                and requires user approval, ensuring you maintain complete control while benefiting from intelligent automation.
+              </p>
+            </div>
             
             {/* Key Benefits */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 pt-6 border-t border-gray-200">
