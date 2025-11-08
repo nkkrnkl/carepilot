@@ -20,7 +20,6 @@ azure-core
 numpy
 
 # Vector Database - Pinecone (Direct API)
-pinecone-client
 
 # LangGraph and LangChain (for agent workflows)
 langgraph
