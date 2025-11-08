@@ -123,20 +123,18 @@ export default function ProfilePage() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <form onSubmit={handleSubmit}>
           {/* Personal Information Section */}
-          <Card className="mb-6 border-2">
-            <CardHeader className="p-0 border-b-0">
-              <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-b px-6 py-4 rounded-t-lg">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
-                    <User className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <div className="flex flex-col">
-                    <CardTitle className="text-2xl mb-1">Personal Information</CardTitle>
-                    <CardDescription className="m-0">Your basic personal details</CardDescription>
-                  </div>
+          <Card className="mb-6 border-2 overflow-hidden py-0">
+            <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-b px-6 py-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                  <User className="h-5 w-5 text-blue-600" />
+                </div>
+                <div className="flex flex-col">
+                  <CardTitle className="text-2xl mb-1">Personal Information</CardTitle>
+                  <CardDescription className="m-0">Your basic personal details</CardDescription>
                 </div>
               </div>
-            </CardHeader>
+            </div>
             <CardContent className="pt-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
@@ -285,20 +283,18 @@ export default function ProfilePage() {
           </Card>
 
           {/* Insurance Information Section */}
-          <Card className="mb-6 border-2 border-blue-200">
-            <CardHeader className="p-0 border-b-0">
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b px-6 py-4 rounded-t-lg">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
-                    <Shield className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <div className="flex flex-col">
-                    <CardTitle className="text-2xl mb-1">Insurance Information</CardTitle>
-                    <CardDescription className="m-0">Your health insurance details</CardDescription>
-                  </div>
+          <Card className="mb-6 border-2 border-blue-200 overflow-hidden py-0">
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b px-6 py-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                  <Shield className="h-5 w-5 text-blue-600" />
+                </div>
+                <div className="flex flex-col">
+                  <CardTitle className="text-2xl mb-1">Insurance Information</CardTitle>
+                  <CardDescription className="m-0">Your health insurance details</CardDescription>
                 </div>
               </div>
-            </CardHeader>
+            </div>
             <CardContent className="pt-6 space-y-4">
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-2 block flex items-center gap-2">
@@ -419,20 +415,18 @@ export default function ProfilePage() {
           </Card>
 
           {/* Insurance Coverage Details Section */}
-          <Card className="mb-6 border-2 border-green-200">
-            <CardHeader className="p-0 border-b-0">
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-b px-6 py-4 rounded-t-lg">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
-                    <DollarSign className="h-5 w-5 text-green-600" />
-                  </div>
-                  <div className="flex flex-col">
-                    <CardTitle className="text-2xl mb-1">Coverage Details</CardTitle>
-                    <CardDescription className="m-0">Your insurance coverage and cost information</CardDescription>
-                  </div>
+          <Card className="mb-6 border-2 border-green-200 overflow-hidden py-0">
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-b px-6 py-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
+                  <DollarSign className="h-5 w-5 text-green-600" />
+                </div>
+                <div className="flex flex-col">
+                  <CardTitle className="text-2xl mb-1">Coverage Details</CardTitle>
+                  <CardDescription className="m-0">Your insurance coverage and cost information</CardDescription>
                 </div>
               </div>
-            </CardHeader>
+            </div>
             <CardContent className="pt-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -537,20 +531,18 @@ export default function ProfilePage() {
           </Card>
 
           {/* Emergency Contact Section */}
-          <Card className="mb-6 border-2 border-orange-200">
-            <CardHeader className="p-0 border-b-0">
-              <div className="bg-gradient-to-r from-orange-50 to-amber-50 border-b px-6 py-4 rounded-t-lg">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
-                    <User className="h-5 w-5 text-orange-600" />
-                  </div>
-                  <div className="flex flex-col">
-                    <CardTitle className="text-2xl mb-1">Emergency Contact</CardTitle>
-                    <CardDescription className="m-0">Contact information for emergencies</CardDescription>
-                  </div>
+          <Card className="mb-6 border-2 border-orange-200 overflow-hidden py-0">
+            <div className="bg-gradient-to-r from-orange-50 to-amber-50 border-b px-6 py-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
+                  <User className="h-5 w-5 text-orange-600" />
+                </div>
+                <div className="flex flex-col">
+                  <CardTitle className="text-2xl mb-1">Emergency Contact</CardTitle>
+                  <CardDescription className="m-0">Contact information for emergencies</CardDescription>
                 </div>
               </div>
-            </CardHeader>
+            </div>
             <CardContent className="pt-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -593,20 +585,18 @@ export default function ProfilePage() {
           </Card>
 
           {/* Additional Information Section */}
-          <Card className="mb-6 border-2 border-purple-200">
-            <CardHeader className="p-0 border-b-0">
-              <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-b px-6 py-4 rounded-t-lg">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
-                    <FileText className="h-5 w-5 text-purple-600" />
-                  </div>
-                  <div className="flex flex-col">
-                    <CardTitle className="text-2xl mb-1">Additional Information</CardTitle>
-                    <CardDescription className="m-0">Healthcare provider and pharmacy details</CardDescription>
-                  </div>
+          <Card className="mb-6 border-2 border-purple-200 overflow-hidden py-0">
+            <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-b px-6 py-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
+                  <FileText className="h-5 w-5 text-purple-600" />
+                </div>
+                <div className="flex flex-col">
+                  <CardTitle className="text-2xl mb-1">Additional Information</CardTitle>
+                  <CardDescription className="m-0">Healthcare provider and pharmacy details</CardDescription>
                 </div>
               </div>
-            </CardHeader>
+            </div>
             <CardContent className="pt-6 space-y-4">
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-2 block">
