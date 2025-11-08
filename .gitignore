@@ -14,7 +14,9 @@ downloads/
 eggs/
 .eggs/
 # Python lib (but not TypeScript lib/)
-/lib/
+# Note: We need to ignore Python's /lib/ but not TypeScript's lib/
+# The pattern below only matches Python's lib in the root, not TypeScript lib/
+# /lib/  # Commented out - we need TypeScript lib/ directory
 lib64/
 parts/
 sdist/

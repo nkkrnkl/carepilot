@@ -1,16 +1,16 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
-import { auth0 } from "./lib/auth0";
-
 export async function middleware(request: NextRequest) {
-  try {
-    const response = await auth0.middleware(request);
-    return response;
-  } catch (error) {
-    console.error("Auth0 middleware error:", error);
-    return NextResponse.next();
-  }
+  // Auth0 SDK v4 handles authentication routes via /api/auth/* API routes
+  // Middleware is optional - authentication checks happen in page components using useUser()
+  // We can add custom middleware logic here if needed (e.g., route protection)
+  
+  const { pathname } = request.nextUrl;
+  
+  // Pass through all requests
+  // Auth0 authentication is handled by the API route at /api/auth/[...auth0]
+  return NextResponse.next();
 }
 
 export const config = {

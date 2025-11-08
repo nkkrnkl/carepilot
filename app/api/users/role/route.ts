@@ -5,14 +5,14 @@
  */
 
 import { NextResponse } from "next/server";
-import { auth0 } from "@/lib/auth0";
+import { getSession } from "@auth0/nextjs-auth0";
 import { getUserByEmail, updateUser, createUser } from "@/lib/azure/sql-storage";
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    const session = await auth0.getSession();
+    const session = await getSession();
     if (!session?.user?.email) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
-    const session = await auth0.getSession();
+    const session = await getSession();
     if (!session?.user?.email) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
