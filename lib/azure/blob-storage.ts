@@ -6,7 +6,7 @@
 import { BlobServiceClient, ContainerClient } from "@azure/storage-blob";
 
 const AZURE_STORAGE_CONNECTION_STRING = process.env.AZURE_STORAGE_CONNECTION_STRING || "";
-const CONTAINER_NAME = process.env.AZURE_BLOB_CONTAINER_NAME || "carepilot-data";
+const CONTAINER_NAME = process.env.AZURE_BLOB_CONTAINER_NAME || "doctor-data";
 
 let blobServiceClient: BlobServiceClient | null = null;
 let containerClient: ContainerClient | null = null;

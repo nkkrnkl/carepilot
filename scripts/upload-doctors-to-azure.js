@@ -14,7 +14,7 @@ const fs = require('fs');
 const path = require('path');
 
 const AZURE_STORAGE_CONNECTION_STRING = process.env.AZURE_STORAGE_CONNECTION_STRING;
-const CONTAINER_NAME = process.env.AZURE_BLOB_CONTAINER_NAME || "carepilot-data";
+const CONTAINER_NAME = process.env.AZURE_BLOB_CONTAINER_NAME || "doctor-data";
 const DOCTORS_FILE_PATH = path.join(__dirname, '../data/doctors.json');
 
 async function uploadDoctorsToAzure() {
