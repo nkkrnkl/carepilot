@@ -1,9 +1,28 @@
 #!/bin/bash
 
 # Script to set up .env file with Azure Storage connection string
+# IMPORTANT: Replace these values with your own Azure resources
 
-STORAGE_ACCOUNT_NAME="hackstoragexz"
-SUBSCRIPTION_ID="41f56be4-b097-45ca-b7a6-b064a0c7189e"
+# Set your Azure Storage account name here
+STORAGE_ACCOUNT_NAME="${AZURE_STORAGE_ACCOUNT_NAME:-your-storage-account-name}"
+
+# Set your Azure subscription ID here
+SUBSCRIPTION_ID="${AZURE_SUBSCRIPTION_ID:-your-subscription-id}"
+
+# Check if values are still placeholders
+if [ "$STORAGE_ACCOUNT_NAME" = "your-storage-account-name" ] || [ "$SUBSCRIPTION_ID" = "your-subscription-id" ]; then
+    echo "⚠️  WARNING: Please set your Azure credentials!"
+    echo ""
+    echo "Option 1: Set environment variables before running this script:"
+    echo "  export AZURE_STORAGE_ACCOUNT_NAME='your-storage-account'"
+    echo "  export AZURE_SUBSCRIPTION_ID='your-subscription-id'"
+    echo "  ./scripts/setup-env.sh"
+    echo ""
+    echo "Option 2: Edit this script and replace the placeholder values"
+    echo ""
+    echo "Option 3: Manually create .env file with your credentials (see .env.example)"
+    exit 1
+fi
 
 echo "🔧 Setting up .env file for Azure Blob Storage..."
 echo ""

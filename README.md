@@ -1,4 +1,211 @@
-# CarePilot - Pinecone Vector Store and RAG Retriever
+# CarePilot
+
+CarePilot is an AI-powered healthcare navigation system that helps streamline your healthcare experience. Built with Next.js, TypeScript, and modern web technologies.
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- **Node.js** 18.17 or higher (you have v24.4.1 ✓)
+- **npm** or **yarn** or **pnpm**
+- **Python** 3.8+ (for backend features)
+- Accounts for:
+  - Auth0 (for authentication)
+  - Azure (for storage and AI services)
+  - Pinecone (for vector database)
+  - OpenAI (for lab report extraction)
+
+### Installation
+
+1. **Clone the repository:**
+   ```bash
+   git clone <your-repo-url>
+   cd shadcntheme
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Set up environment variables:**
+   ```bash
+   cp .env.example .env
+   ```
+   
+   Then edit `.env` and fill in your own credentials (see [Environment Variables](#environment-variables) section below).
+
+4. **Set up the database:**
+   ```bash
+   npm run db:push
+   npm run db:seed
+   ```
+
+5. **Install Python dependencies (for backend features):**
+   ```bash
+   cd backend
+   pip install -r requirements.txt
+   cd ..
+   ```
+
+6. **Start the development server:**
+   ```bash
+   npm run dev
+   ```
+
+7. **Open your browser:**
+   Navigate to [http://localhost:3000](http://localhost:3000)
+
+## 📋 Environment Variables
+
+Copy `.env.example` to `.env` and fill in the following variables:
+
+### Required Variables
+
+- **DATABASE_URL**: Database connection string (SQLite for local dev: `file:./dev.db`)
+- **AUTH0_SECRET**: Generate with `openssl rand -hex 32`
+- **AUTH0_ISSUER_BASE_URL**: Your Auth0 domain (e.g., `https://your-tenant.us.auth0.com`)
+- **AUTH0_CLIENT_ID**: Your Auth0 application client ID
+- **AUTH0_CLIENT_SECRET**: Your Auth0 application client secret
+- **AZURE_STORAGE_CONNECTION_STRING**: Azure Storage account connection string
+- **PINECONE_API_KEY**: Your Pinecone API key
+- **AZURE_OPENAI_ENDPOINT**: Azure OpenAI endpoint URL
+- **AZURE_OPENAI_API_KEY**: Azure OpenAI API key
+- **OPENAI_API_KEY**: OpenAI API key (for lab report extraction)
+
+### Optional Variables
+
+- **AZURE_SQL_***: Azure SQL Database credentials (for production)
+- **K2_API_KEY**: K2 API key (for additional AI features)
+
+See `.env.example` for a complete list with descriptions.
+
+## 🏗️ Project Structure
+
+```
+├── app/                    # Next.js app directory
+│   ├── api/               # API routes
+│   ├── features/          # Feature pages
+│   └── ...
+├── backend/               # Python backend services
+│   ├── claims_agent.py   # Claims processing agent
+│   ├── lab_agent.py      # Lab analysis agent
+│   └── ...
+├── components/            # React components
+│   ├── ui/               # UI components (shadcn)
+│   └── ...
+├── lib/                   # Utility libraries
+├── prisma/               # Database schema
+└── scripts/              # Utility scripts
+```
+
+## 📚 Features
+
+- **Patient Portal**: View lab results, appointments, and medical history
+- **Lab Analysis**: AI-powered lab report analysis
+- **Claims Processing**: Automated insurance claims processing
+- **Appointment Scheduling**: Book appointments with healthcare providers
+- **Bill Negotiation**: AI-assisted medical bill negotiation
+
+## 🛠️ Available Scripts
+
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run start` - Start production server
+- `npm run lint` - Run ESLint
+- `npm run db:push` - Push database schema changes
+- `npm run db:seed` - Seed database with sample data
+- `npm run generate-doctors` - Generate mock doctor data
+- `npm run upload-doctors` - Upload doctors to Azure Blob Storage
+
+## 🔧 Setup Guides
+
+For detailed setup instructions, see:
+
+- [Auth0 Setup](./AUTH0-SETUP.md) - Authentication configuration
+- [Azure Setup](./README-AZURE-SETUP.md) - Azure Storage setup
+- [SQL Database Setup](./SQL-DATABASE-SETUP.md) - Database configuration
+- [Backend Setup](./backend/README_SETUP.md) - Python backend setup
+- [Claims Agent Setup](./backend/CLAIMS_SETUP.md) - Claims processing setup
+
+## 🔐 Security Notes
+
+- **Never commit `.env` or `env` files** - they contain sensitive credentials
+- All environment files are gitignored for security
+- Use `.env.example` as a template for required variables
+- Rotate API keys and secrets regularly
+- Use environment-specific credentials for production
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+1. **"Environment variable not set" errors**
+   - Make sure you've copied `.env.example` to `.env`
+   - Verify all required variables are set
+   - Restart your development server after changing `.env`
+
+2. **Database connection errors**
+   - Check `DATABASE_URL` is set correctly
+   - Run `npm run db:push` to initialize the database
+   - For SQLite, ensure the directory is writable
+
+3. **Auth0 authentication not working**
+   - Verify Auth0 credentials in `.env`
+   - Check callback URLs in Auth0 dashboard
+   - Ensure `AUTH0_SECRET` is generated correctly
+
+4. **Azure storage errors**
+   - Verify Azure Storage connection string
+   - Check storage account permissions
+   - Ensure container exists or create it
+
+For more help, see [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)
+
+## 📖 Documentation
+
+- [Pinecone Vector Store Guide](./README.md#pinecone-vector-store-and-rag-retriever) - Vector database setup
+- [Backend README](./backend/README.md) - Backend services documentation
+- [Claims Agent README](./backend/CLAIMS_AGENT_README.md) - Claims processing documentation
+
+## 🚢 Deployment
+
+### Vercel (Recommended)
+
+1. Push your code to GitHub
+2. Import project in [Vercel](https://vercel.com)
+3. Add environment variables in Vercel dashboard
+4. Deploy
+
+### Other Platforms
+
+See deployment guides in the `docs/` directory (if available).
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
+
+## 📝 License
+
+[Your License Here]
+
+## 🙏 Acknowledgments
+
+- Built with [Next.js](https://nextjs.org)
+- UI components from [shadcn/ui](https://ui.shadcn.com)
+- Vector database powered by [Pinecone](https://www.pinecone.io)
+- AI services from [Azure OpenAI](https://azure.microsoft.com/services/cognitive-services/openai-service/)
+
+## 📧 Support
+
+For issues and questions, please open an issue on GitHub.
+
+---
+
+# Pinecone Vector Store and RAG Retriever
 
 Complete guide for using Pinecone Vector Store and RAG Retriever for medical knowledge management and retrieval.
 
@@ -659,44 +866,3 @@ print(config)
 ## Support
 
 For issues and questions, please open an issue on GitHub.
-
-# CarePilot
-
-CarePilot is an AI-powered healthcare navigation system that helps streamline your healthcare experience.
-
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
-
-## Getting Started
-
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

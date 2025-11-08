@@ -1,13 +1,16 @@
 # Manual Setup: Add SQL Credentials to env File
 
-## Step 1: Open Your env File
+## Step 1: Create Your .env File
 
-Your `env` file is located at:
-```
-/Users/aymaanshaikh/Desktop/shadcntheme/env
+**Recommended**: Use `.env.example` as a template:
+
+```bash
+cp .env.example .env
 ```
 
-Open it in any text editor (VS Code, TextEdit, nano, etc.)
+Then open `.env` in any text editor (VS Code, TextEdit, nano, etc.)
+
+**Note**: The project uses `.env` (not `env`) for environment variables. The `.env` file is gitignored for security.
 
 ## Step 2: Add SQL Credentials
 
@@ -15,11 +18,11 @@ Add these lines at the end of your `env` file:
 
 ```bash
 # Azure SQL Database
-AZURE_SQL_SERVER=k2sqldatabaseserver.database.windows.net
-AZURE_SQL_DATABASE=K2Database
+AZURE_SQL_SERVER=your-server.database.windows.net
+AZURE_SQL_DATABASE=your-database-name
 AZURE_SQL_USER=your_username_here
 AZURE_SQL_PASSWORD=your_password_here
-AZURE_SQL_CONNECTION_STRING=Server=k2sqldatabaseserver.database.windows.net;Database=K2Database;User Id=your_username_here;Password=your_password_here;Encrypt=true;TrustServerCertificate=false
+AZURE_SQL_CONNECTION_STRING=Server=your-server.database.windows.net;Database=your-database-name;User Id=your_username_here;Password=your_password_here;Encrypt=true;TrustServerCertificate=false
 ```
 
 ## Step 3: Replace Placeholders
@@ -39,29 +42,25 @@ Save the `env` file after making changes.
 
 ## Example
 
-Here's what your `env` file should look like (with example credentials):
+**Important**: Use `.env.example` as a template! Copy it to `.env` and fill in your own credentials:
 
 ```bash
-K2_API_KEY =IFM-GcZbhYqNGoKWcIuJ
-PINECONE_API_KEY =pcsk_39ikrP_9ruagfrjw3i9C7sitXwzVJ2f3JPy7N9Ft9DasqaX5ReLMPiz7TKP4hDDBvtR6oB
-
-# AZURE_REGION=southeastasia
-
-# Azure AI Foundry Service
-AZURE_OPENAI_ENDPOINT=https://foundrymodelsk2hackathon.cognitiveservices.azure.com/
-AZURE_OPENAI_API_KEY=EWHEqNFG4lLBRe9D99C5JNq6Lw8UtvHycJzpLyU4C93481z0f5kpJQQJ99BKACYeBjFXJ3w3AAAAACOGVzY1
-AZURE_OPENAI_DEPLOYMENT_NAME=text-embedding-3-large-2
-AZURE_OPENAI_API_VERSION=2023-05-15
-
-# Azure SQL Database
-AZURE_SQL_SERVER=k2sqldatabaseserver.database.windows.net
-AZURE_SQL_DATABASE=K2Database
-AZURE_SQL_USER=sqladmin
-AZURE_SQL_PASSWORD=MyStr0ng!P@ssw0rd123
-AZURE_SQL_CONNECTION_STRING=Server=k2sqldatabaseserver.database.windows.net;Database=K2Database;User Id=sqladmin;Password=MyStr0ng!P@ssw0rd123;Encrypt=true;TrustServerCertificate=false
+cp .env.example .env
 ```
 
-**Note**: The example credentials above are just examples. Use your own credentials from Azure Portal!
+Then edit `.env` with your actual credentials. Never use example credentials from documentation files - they are placeholders only!
+
+Your `.env` file should contain your own values for:
+- `K2_API_KEY` - Your K2 API key
+- `PINECONE_API_KEY` - Your Pinecone API key  
+- `AZURE_OPENAI_ENDPOINT` - Your Azure OpenAI endpoint
+- `AZURE_OPENAI_API_KEY` - Your Azure OpenAI API key
+- `AZURE_SQL_SERVER` - Your Azure SQL server name
+- `AZURE_SQL_DATABASE` - Your Azure SQL database name
+- `AZURE_SQL_USER` - Your Azure SQL username
+- `AZURE_SQL_PASSWORD` - Your Azure SQL password
+
+See `.env.example` for the complete list of required environment variables.
 
 ## Step 5: Test the Connection
 
@@ -107,8 +106,9 @@ You should see all 5 SQL-related variables.
 - Verify credentials in Azure Portal
 
 ### File Not Found
-- Make sure you're in the project directory: `/Users/aymaanshaikh/Desktop/shadcntheme`
-- Check that the file is named `env` (not `.env`)
+- Make sure you're in the project root directory
+- Check that the file is named `.env` (not `env`)
+- If the file doesn't exist, copy from `.env.example`: `cp .env.example .env`
 
 ### Permission Denied
 - Make sure you have write permissions on the `env` file

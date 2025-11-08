@@ -2,10 +2,9 @@
 
 ## Prerequisites
 
-1. Auth0 account with the following credentials:
-   - Domain: `dev-mkzc2baz7coa6cg6.us.auth0.com`
-   - Client ID: `ooKrOZCVndrxGt4OHcj8iF9VGIqSGSnC`
-   - Client Secret: `DPAvrTmgF-hnZEwwPZN2l_iw8YLn0_wPWww2pd_OPCLWFAHBtadMzQjm8_ex3-wv`
+1. Auth0 account - Create a free account at [Auth0](https://auth0.com)
+   - You'll need to create an application in your Auth0 dashboard
+   - Get your Domain, Client ID, and Client Secret from the application settings
 
 ## Step 1: Create Environment Variables File
 
@@ -13,18 +12,19 @@ Create a `.env.local` file in the root directory with the following content:
 
 ```env
 # Auth0 Configuration
-AUTH0_SECRET='b87243fb5f48bfa065665382caf3f383a61c22e1b79cddffe8eb230bd0636e11'
+# Generate AUTH0_SECRET using: openssl rand -hex 32
+AUTH0_SECRET='your-auth0-secret-generate-with-openssl-rand-hex-32'
 AUTH0_BASE_URL='http://localhost:3000'
-AUTH0_ISSUER_BASE_URL='https://dev-mkzc2baz7coa6cg6.us.auth0.com'
-AUTH0_CLIENT_ID='ooKrOZCVndrxGt4OHcj8iF9VGIqSGSnC'
-AUTH0_CLIENT_SECRET='DPAvrTmgF-hnZEwwPZN2l_iw8YLn0_wPWww2pd_OPCLWFAHBtadMzQjm8_ex3-wv'
+AUTH0_ISSUER_BASE_URL='https://your-tenant.us.auth0.com'
+AUTH0_CLIENT_ID='your-auth0-client-id'
+AUTH0_CLIENT_SECRET='your-auth0-client-secret'
 AUTH0_AUDIENCE=''
 
-# Azure SQL Database Configuration (your existing config)
-AZURE_SQL_SERVER='k2sqldatabaseserver.database.windows.net'
-AZURE_SQL_DATABASE='K2Database'
-AZURE_SQL_USER='carepilot'
-AZURE_SQL_PASSWORD='abc123!!'
+# Azure SQL Database Configuration (Optional - for production)
+AZURE_SQL_SERVER='your-server.database.windows.net'
+AZURE_SQL_DATABASE='your-database-name'
+AZURE_SQL_USER='your-sql-username'
+AZURE_SQL_PASSWORD='your-sql-password'
 ```
 
 **Note:** For production, generate a new `AUTH0_SECRET` using:
@@ -214,10 +214,13 @@ export default function SignInPage() {
 3. Add **Allowed Callback URLs**:
    - `http://localhost:3000/api/auth/callback`
    - `http://localhost:3000` (for development)
+   - Add your production URL when deploying (e.g., `https://yourdomain.com/api/auth/callback`)
 4. Add **Allowed Logout URLs**:
    - `http://localhost:3000`
+   - Add your production URL when deploying
 5. Add **Allowed Web Origins**:
    - `http://localhost:3000`
+   - Add your production URL when deploying
 
 ## Step 7: Update Booking to Use Authenticated User
 
