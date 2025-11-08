@@ -126,12 +126,12 @@ export default function ProfilePage() {
           <Card className="mb-6 border-2">
             <CardHeader className="bg-gradient-to-r from-blue-50 to-cyan-50 border-b">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
                   <User className="h-5 w-5 text-blue-600" />
                 </div>
-                <div>
-                  <CardTitle className="text-2xl">Personal Information</CardTitle>
-                  <CardDescription>Your basic personal details</CardDescription>
+                <div className="flex flex-col">
+                  <CardTitle className="text-2xl mb-1">Personal Information</CardTitle>
+                  <CardDescription className="m-0">Your basic personal details</CardDescription>
                 </div>
               </div>
             </CardHeader>
@@ -286,12 +286,12 @@ export default function ProfilePage() {
           <Card className="mb-6 border-2 border-blue-200">
             <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
                   <Shield className="h-5 w-5 text-blue-600" />
                 </div>
-                <div>
-                  <CardTitle className="text-2xl">Insurance Information</CardTitle>
-                  <CardDescription>Your health insurance details</CardDescription>
+                <div className="flex flex-col">
+                  <CardTitle className="text-2xl mb-1">Insurance Information</CardTitle>
+                  <CardDescription className="m-0">Your health insurance details</CardDescription>
                 </div>
               </div>
             </CardHeader>
@@ -418,12 +418,12 @@ export default function ProfilePage() {
           <Card className="mb-6 border-2 border-green-200">
             <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 border-b">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center">
+                <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
                   <DollarSign className="h-5 w-5 text-green-600" />
                 </div>
-                <div>
-                  <CardTitle className="text-2xl">Coverage Details</CardTitle>
-                  <CardDescription>Your insurance coverage and cost information</CardDescription>
+                <div className="flex flex-col">
+                  <CardTitle className="text-2xl mb-1">Coverage Details</CardTitle>
+                  <CardDescription className="m-0">Your insurance coverage and cost information</CardDescription>
                 </div>
               </div>
             </CardHeader>
@@ -534,12 +534,12 @@ export default function ProfilePage() {
           <Card className="mb-6 border-2 border-orange-200">
             <CardHeader className="bg-gradient-to-r from-orange-50 to-amber-50 border-b">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-orange-100 flex items-center justify-center">
+                <div className="h-10 w-10 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
                   <User className="h-5 w-5 text-orange-600" />
                 </div>
-                <div>
-                  <CardTitle className="text-2xl">Emergency Contact</CardTitle>
-                  <CardDescription>Contact information for emergencies</CardDescription>
+                <div className="flex flex-col">
+                  <CardTitle className="text-2xl mb-1">Emergency Contact</CardTitle>
+                  <CardDescription className="m-0">Contact information for emergencies</CardDescription>
                 </div>
               </div>
             </CardHeader>
@@ -588,12 +588,12 @@ export default function ProfilePage() {
           <Card className="mb-6 border-2 border-purple-200">
             <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-purple-100 flex items-center justify-center">
+                <div className="h-10 w-10 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
                   <FileText className="h-5 w-5 text-purple-600" />
                 </div>
-                <div>
-                  <CardTitle className="text-2xl">Additional Information</CardTitle>
-                  <CardDescription>Healthcare provider and pharmacy details</CardDescription>
+                <div className="flex flex-col">
+                  <CardTitle className="text-2xl mb-1">Additional Information</CardTitle>
+                  <CardDescription className="m-0">Healthcare provider and pharmacy details</CardDescription>
                 </div>
               </div>
             </CardHeader>
