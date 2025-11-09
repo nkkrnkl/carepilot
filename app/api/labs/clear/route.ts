@@ -1,23 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/**
+ * @deprecated This route is deprecated. Lab reports are now managed through
+ * the document upload system (/api/documents/upload) which stores data in
+ * SQL Server and Pinecone. Please update your code to use the new system.
+ */
 export async function DELETE(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const userId = searchParams.get("userId") || "demo-user";
 
-    // Delete all lab reports for the user
-    const result = await prisma.labReport.deleteMany({
-      where: { userId },
-    });
+    console.warn(
+      "⚠️  /api/labs/clear is deprecated. Lab reports are now stored in SQL Server via /api/documents/upload"
+    );
 
+    // Return success but no-op - lab reports are now managed through SQL Server
+    // TODO: Delete from SQL Server LabReport table if needed
     return NextResponse.json({
       success: true,
-      deletedCount: result.count,
-      message: `Deleted ${result.count} lab report(s) for user ${userId}`,
+      deletedCount: 0,
+      message: "Lab reports are now managed through SQL Server. This endpoint is deprecated.",
     });
   } catch (error) {
     console.error("Clear error:", error);
@@ -32,4 +37,3 @@ export async function DELETE(request: NextRequest) {
 export async function POST(request: NextRequest) {
   return DELETE(request);
 }
-

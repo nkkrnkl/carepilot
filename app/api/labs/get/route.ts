@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/**
+ * @deprecated This route is deprecated. Lab reports are now managed through
+ * the document upload system (/api/documents/upload) which stores data in
+ * SQL Server and Pinecone. Please update your code to use the new system.
+ */
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
@@ -13,27 +17,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Missing id parameter" }, { status: 400 });
     }
 
-    const report = await prisma.labReport.findUnique({
-      where: { id },
-    });
+    console.warn(
+      "⚠️  /api/labs/get is deprecated. Lab reports are now stored in SQL Server via /api/documents/upload"
+    );
 
-    if (!report) {
-      return NextResponse.json({ error: "Report not found" }, { status: 404 });
-    }
-
-    return NextResponse.json({
-      id: report.id,
-      userId: report.userId,
-      title: report.title,
-      date: report.date.toISOString(),
-      hospital: report.hospital,
-      doctor: report.doctor,
-      fileUrl: report.fileUrl,
-      rawExtract: JSON.parse(report.rawExtract),
-      parameters: JSON.parse(report.parameters),
-      createdAt: report.createdAt.toISOString(),
-      updatedAt: report.updatedAt.toISOString(),
-    });
+    // Return 404 - lab reports are now managed through SQL Server
+    // TODO: Query from SQL Server LabReport table if needed
+    return NextResponse.json({ error: "Report not found. Lab reports are now managed through SQL Server." }, { status: 404 });
   } catch (error) {
     console.error("Get error:", error);
     return NextResponse.json(
@@ -42,4 +32,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-

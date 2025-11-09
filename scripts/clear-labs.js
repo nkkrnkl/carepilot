@@ -2,37 +2,15 @@
 /**
  * Clear all lab reports from the database
  * This script runs before npm run dev to clear data for debugging
+ * 
+ * NOTE: Prisma has been removed. This script is now a no-op.
+ * Lab reports are now stored in SQL Server via the document upload system.
  */
 
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
-
 async function clearLabs() {
-  try {
-    // Check if DATABASE_URL is set (required for Prisma)
-    if (!process.env.DATABASE_URL) {
-      console.log("⚠️  DATABASE_URL not set, skipping lab report cleanup");
-      console.log("   (This is normal if you're not using Prisma for lab reports)");
-      return;
-    }
-
-    const userId = "demo-user";
-    const result = await prisma.labReport.deleteMany({
-      where: { userId },
-    });
-    console.log(`✓ Cleared ${result.count} lab report(s) for debugging`);
-  } catch (error) {
-    // Don't exit on error - just log it and continue
-    console.error("⚠️  Error clearing lab reports (non-fatal):", error.message || error);
-    console.log("   Continuing with dev server startup...");
-  } finally {
-    try {
-      await prisma.$disconnect();
-    } catch (error) {
-      // Ignore disconnect errors
-    }
-  }
+  console.log("ℹ️  Lab clearing script: Prisma has been removed.");
+  console.log("   Lab reports are now managed through SQL Server and the document upload system.");
+  console.log("   Continuing with dev server startup...");
 }
 
 clearLabs();
-

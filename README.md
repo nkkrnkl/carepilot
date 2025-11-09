@@ -37,8 +37,8 @@ CarePilot is an AI-powered healthcare navigation system that helps streamline yo
 
 4. **Set up the database:**
    ```bash
-   npm run db:push
-   npm run db:seed
+   # Database is managed through SQL Server (Azure)
+   # See database/ directory for schema and setup instructions
    ```
 
 5. **Install Python dependencies (for backend features):**
@@ -95,7 +95,7 @@ See `.env.example` for a complete list with descriptions.
 │   ├── ui/               # UI components (shadcn)
 │   └── ...
 ├── lib/                   # Utility libraries
-├── prisma/               # Database schema
+├── database/             # Database schema and documentation (SQL Server)
 └── scripts/              # Utility scripts
 ```
 

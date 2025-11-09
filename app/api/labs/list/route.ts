@@ -1,27 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/**
+ * @deprecated This route is deprecated. Lab reports are now managed through
+ * the document upload system (/api/documents/upload) which stores data in
+ * SQL Server and Pinecone. Please update your code to use the new system.
+ */
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const userId = searchParams.get("userId") || "demo-user";
 
-    const reports = await prisma.labReport.findMany({
-      where: { userId },
-      orderBy: { date: "desc" },
-      select: {
-        id: true,
-        title: true,
-        date: true,
-        hospital: true,
-        doctor: true,
-      },
-    });
+    // Return empty array - lab reports are now managed through SQL Server
+    // TODO: Query from SQL Server LabReport table if needed
+    console.warn(
+      "⚠️  /api/labs/list is deprecated. Lab reports are now stored in SQL Server via /api/documents/upload"
+    );
 
-    return NextResponse.json(reports);
+    return NextResponse.json([]);
   } catch (error) {
     console.error("List error:", error);
     return NextResponse.json(
@@ -30,4 +28,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-

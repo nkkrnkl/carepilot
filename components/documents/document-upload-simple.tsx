@@ -19,6 +19,10 @@ interface UploadedFile {
 interface DocumentUploadSimpleProps {
   userId?: string;
   onUploadComplete?: (file: UploadedFile) => void;
+  defaultDocType?: "plan_document" | "lab_report" | "eob";
+  showDocTypeSelector?: boolean;
+  title?: string;
+  description?: string;
 }
 
 const DOCUMENT_TYPES = [
@@ -41,11 +45,15 @@ const DOCUMENT_TYPES = [
 
 export function DocumentUploadSimple({ 
   userId = "user-123", 
-  onUploadComplete 
+  onUploadComplete,
+  defaultDocType = "plan_document",
+  showDocTypeSelector = true,
+  title = "Upload PDF Documents",
+  description = "Upload PDF documents to be chunked, embedded, and stored in the vector database"
 }: DocumentUploadSimpleProps) {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [dragActive, setDragActive] = useState(false);
-  const [selectedType, setSelectedType] = useState<"plan_document" | "lab_report" | "eob">("plan_document");
+  const [selectedType, setSelectedType] = useState<"plan_document" | "lab_report" | "eob">(defaultDocType);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -126,61 +134,47 @@ export function DocumentUploadSimple({
 
       const result = await response.json();
 
-      // If EOB extraction is in progress, show extracting status
+      // Prepare the updated file data for state and callback
+      const updatedFileData: UploadedFile = {
+        ...fileData,
+        status: "success" as const,
+        chunkCount: result.chunkCount,
+        eobExtracted: fileData.type === "eob" && result.eobExtraction ? result.eobExtraction.success : undefined,
+        eobError: fileData.type === "eob" && result.eobExtraction && !result.eobExtraction.success 
+          ? result.eobExtraction.error || "EOB extraction failed" 
+          : undefined,
+      };
+
+      // Update state
       if (fileData.type === "eob" && result.eobExtraction) {
         if (result.eobExtraction.success) {
           setUploadedFiles((prev) =>
             prev.map((f) =>
-              f.id === fileData.id
-                ? { 
-                    ...f, 
-                    status: "success" as const,
-                    chunkCount: result.chunkCount,
-                    eobExtracted: true
-                  }
-                : f
+              f.id === fileData.id ? updatedFileData : f
             )
           );
         } else {
           // EOB extraction failed but upload succeeded
-          setUploadedFiles((prev) =>
-            prev.map((f) =>
-              f.id === fileData.id
-                ? { 
-                    ...f, 
-                    status: "success" as const,
-                    chunkCount: result.chunkCount,
-                    eobExtracted: false,
-                    eobError: result.eobExtraction.error || "EOB extraction failed"
-                  }
-                : f
+      setUploadedFiles((prev) =>
+        prev.map((f) =>
+              f.id === fileData.id ? updatedFileData : f
             )
           );
         }
       } else {
         setUploadedFiles((prev) =>
           prev.map((f) =>
-            f.id === fileData.id
-              ? { 
-                  ...f, 
-                  status: "success" as const,
-                  chunkCount: result.chunkCount 
-                }
-              : f
-          )
-        );
+            f.id === fileData.id ? updatedFileData : f
+        )
+      );
       }
 
+      // Call onUploadComplete callback with the completed file data
       if (onUploadComplete) {
-        const completedFile = uploadedFiles.find(f => f.id === fileData.id);
-        if (completedFile) {
-          onUploadComplete({ 
-            ...completedFile, 
-            status: "success", 
-            chunkCount: result.chunkCount,
-            eobExtracted: result.eobExtraction?.success || false
-          });
-        }
+        onUploadComplete({
+          ...updatedFileData,
+          id: result.docId || fileData.id, // Use docId from result if available
+        });
       }
     } catch (error) {
       setUploadedFiles((prev) =>
@@ -204,13 +198,14 @@ export function DocumentUploadSimple({
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>Upload PDF Documents</CardTitle>
+        <CardTitle>{title}</CardTitle>
         <CardDescription>
-          Upload PDF documents to be chunked, embedded, and stored in the vector database
+          {description}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Document Type Selector */}
+        {showDocTypeSelector && (
         <div className="space-y-2">
           <label className="text-sm font-medium text-gray-700">
             Document Type
@@ -230,6 +225,7 @@ export function DocumentUploadSimple({
             {DOCUMENT_TYPES.find(t => t.value === selectedType)?.description}
           </p>
         </div>
+        )}
 
         {/* Upload Area */}
         <div
@@ -312,8 +308,8 @@ export function DocumentUploadSimple({
                 )}
                 {fileData.status === "success" && (
                   <div className="flex flex-col items-end gap-1">
-                    <div className="flex items-center gap-2 text-green-600">
-                      <CheckCircle2 className="h-5 w-5" />
+                  <div className="flex items-center gap-2 text-green-600">
+                    <CheckCircle2 className="h-5 w-5" />
                       <span className="text-xs">Uploaded</span>
                     </div>
                     {fileData.type === "eob" && fileData.eobExtracted === true && (

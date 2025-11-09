@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UploadDropzone } from "@/components/labs/UploadDropzone";
+import { DocumentUploadSimple } from "@/components/documents/document-upload-simple";
 import { PreviousReports } from "@/components/labs/PreviousReports";
 import { CurrentDataCards } from "@/components/labs/CurrentDataCards";
 import { PastVisitsCharts } from "@/components/labs/PastVisitsCharts";
@@ -58,10 +58,17 @@ export default function LabsPage() {
     }
   }
 
-  function handleUploadSuccess(reportId: string) {
-    setSelectedReportId(reportId);
-    setRefreshTrigger((prev) => prev + 1); // Trigger refresh of previous reports list
-    toast.success("Lab report uploaded and processed successfully!");
+  function handleUploadSuccess(file: any) {
+    // Extract report ID from uploaded file
+    const reportId = file.id || file.docId;
+    if (reportId) {
+      setSelectedReportId(reportId);
+      setRefreshTrigger((prev) => prev + 1); // Trigger refresh of previous reports list
+      toast.success("Lab report uploaded and processed successfully!");
+    } else {
+      toast.success("Lab report uploaded successfully!");
+      setRefreshTrigger((prev) => prev + 1); // Refresh list even without report ID
+    }
   }
 
   function handleSelectReport(reportId: string) {
@@ -100,7 +107,14 @@ export default function LabsPage() {
         {/* Two-Column Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           {/* Left: Upload PDF */}
-          <UploadDropzone onUploadSuccess={handleUploadSuccess} userId={userId} />
+          <DocumentUploadSimple
+            userId={userId}
+            defaultDocType="lab_report"
+            showDocTypeSelector={false}
+            title="Upload Lab Report"
+            description="Upload PDF lab reports to analyze your lab results. Files will be processed and stored for analysis."
+            onUploadComplete={handleUploadSuccess}
+          />
 
           {/* Right: View Previous Reports */}
           <PreviousReports
@@ -118,7 +132,7 @@ export default function LabsPage() {
               <TabsTrigger value="current">Current Data</TabsTrigger>
               <TabsTrigger value="past">Past Visits</TabsTrigger>
             </TabsList>
-          </div>
+        </div>
 
           <TabsContent value="current">
             {loading ? (
