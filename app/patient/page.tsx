@@ -8,6 +8,7 @@ import { PatientNavbar } from "@/components/layout/patient-navbar";
 import { Calendar, Clock, MapPin, Stethoscope, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useUser } from '@auth0/nextjs-auth0/client';
+import { DocumentUploadSimple } from "@/components/documents/document-upload-simple";
 
 export default function PatientDashboard() {
   const { user, isLoading: userLoading } = useUser();
@@ -146,6 +147,31 @@ export default function PatientDashboard() {
                 </Button>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Document Upload Section */}
+        <Card className="mb-8 border-2 border-gray-200 shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-2xl font-bold text-gray-900">
+              Upload Your Documents
+            </CardTitle>
+            <CardDescription className="text-gray-600">
+              Upload PDF documents to be processed, chunked, and stored in our vector database for intelligent retrieval. Select the document type to ensure proper processing.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DocumentUploadSimple 
+              userId={user?.email || "anonymous"}
+              defaultDocType="plan_document"
+              showDocTypeSelector={true}
+              title="Upload Healthcare Documents"
+              description="Upload lab reports, insurance documents, or EOBs. Each document type will be processed and analyzed accordingly."
+              onUploadComplete={(file) => {
+                console.log("Upload complete:", file);
+                // You can add toast notifications or other feedback here
+              }}
+            />
           </CardContent>
         </Card>
       </div>
