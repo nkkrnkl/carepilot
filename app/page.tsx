@@ -8,7 +8,7 @@ import { FeatureCard } from "@/components/feature-card";
 import { HeroSection } from "@/components/sections/hero-section";
 import { BenefitsSection } from "@/components/sections/benefits-section";
 import { CTASection } from "@/components/sections/cta-section";
-import { DocumentUploadSimple } from "@/components/documents/document-upload-simple";
+// import { DocumentUploadSimple } from "@/components/documents/document-upload-simple";
 import { FEATURES, ROUTES } from "@/lib/constants";
 import { Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -69,7 +69,7 @@ export default function LandingPage() {
       </section>
 
       {/* Document Upload Section */}
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+      {/* <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">Upload Your Documents</h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
@@ -87,7 +87,7 @@ export default function LandingPage() {
             // You can add toast notifications or other feedback here
           }}
         />
-      </section>
+      </section> */}
 
       <BenefitsSection />
 
