@@ -24,14 +24,22 @@ export default function SignInPage() {
           // First, check if role was stored during signup (before Auth0 callback)
           const storedRole = sessionStorage.getItem("signupRole");
           
+          console.log("Checking user role for:", user.email);
+          console.log("Stored role from sessionStorage:", storedRole);
+          
           // Check if user has a role set in database
           const response = await fetch(`/api/users/role`);
           const data = await response.json();
           
+          console.log("Role API response:", data);
+          
           if (data.success && data.role) {
             // User has a role in database, automatically redirect to appropriate dashboard
+            console.log("User has role in database:", data.role);
             sessionStorage.removeItem("signupRole"); // Clean up
-            router.push(data.role === "doctor" ? "/doctorportal" : "/patient");
+            const redirectUrl = data.role === "doctor" ? "/doctorportal" : "/patient";
+            console.log("Redirecting to:", redirectUrl);
+            router.push(redirectUrl);
             return;
           }
           
@@ -39,21 +47,37 @@ export default function SignInPage() {
           const userResponse = await fetch(`/api/users?emailAddress=${encodeURIComponent(user.email)}`);
           const userData = await userResponse.json();
           
+          console.log("User data response:", userData);
+          
           if (userData.success && userData.user?.userRole) {
             // User has a role in database, automatically redirect
+            console.log("User has role in user data:", userData.user.userRole);
             sessionStorage.removeItem("signupRole"); // Clean up
-            router.push(userData.user.userRole === "doctor" ? "/doctorportal" : "/patient");
+            const redirectUrl = userData.user.userRole === "doctor" ? "/doctorportal" : "/patient";
+            console.log("Redirecting to:", redirectUrl);
+            router.push(redirectUrl);
             return;
           }
           
           // No role in database - check if role was stored during signup
           if (storedRole && (storedRole === "patient" || storedRole === "doctor")) {
             // Role was stored, save it to database and redirect
+            console.log("Saving stored role to database:", storedRole);
             await saveRoleAndRedirect(storedRole as "patient" | "doctor");
             return;
           }
           
+          // Check URL parameters for role (in case it was passed through Auth0)
+          const urlParams = new URLSearchParams(window.location.search);
+          const urlRole = urlParams.get("role");
+          if (urlRole && (urlRole === "patient" || urlRole === "doctor")) {
+            console.log("Found role in URL parameters:", urlRole);
+            await saveRoleAndRedirect(urlRole as "patient" | "doctor");
+            return;
+          }
+          
           // No role found - show role selection
+          console.log("No role found, showing role selection");
           setShowRoleSelection(true);
           setCheckingRole(false);
         } catch (error) {
@@ -69,10 +93,15 @@ export default function SignInPage() {
   }, [user, isLoading, router]);
 
   async function saveRoleAndRedirect(role: "patient" | "doctor") {
-    if (!user?.email) return;
+    if (!user?.email) {
+      console.error("Cannot save role: user email not available");
+      return;
+    }
 
     setCheckingRole(true);
     try {
+      console.log("Saving role to database:", role, "for user:", user.email);
+      
       const response = await fetch("/api/users/role", {
         method: "POST",
         headers: {
@@ -82,16 +111,26 @@ export default function SignInPage() {
       });
 
       const data = await response.json();
+      console.log("Role save response:", data);
 
       if (!data.success) {
         throw new Error(data.error || "Failed to save role");
       }
 
-      // Clear signup role from sessionStorage
+      // Clear signup role from sessionStorage and URL params
       sessionStorage.removeItem("signupRole");
+      
+      // Clean up URL if it has role parameter
+      if (window.location.search.includes("role=")) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("role");
+        window.history.replaceState({}, "", url.toString());
+      }
 
       // Redirect to appropriate dashboard
-      router.push(role === "doctor" ? "/doctorportal" : "/patient");
+      const redirectUrl = role === "doctor" ? "/doctorportal" : "/patient";
+      console.log("Role saved successfully, redirecting to:", redirectUrl);
+      router.push(redirectUrl);
     } catch (err: any) {
       console.error("Error saving role:", err);
       setCheckingRole(false);

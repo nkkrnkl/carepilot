@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { executePython } from "@/lib/python-bridge";
 import { join } from "path";
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -52,4 +54,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

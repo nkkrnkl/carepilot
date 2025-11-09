@@ -110,4 +110,3 @@ export interface CasesResponse {
     case_data: CaseData;
   }>;
 }
-

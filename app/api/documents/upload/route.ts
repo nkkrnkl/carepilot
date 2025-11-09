@@ -4,6 +4,8 @@ import { join } from "path";
 import { readFile, writeFile } from "fs/promises";
 import { existsSync } from "fs";
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
@@ -243,4 +245,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

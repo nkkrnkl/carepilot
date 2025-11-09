@@ -801,10 +801,10 @@ export default function SettingsPage() {
             {/* Save Button */}
             <div className="flex items-center justify-between">
               <Button variant="outline" asChild>
-                <Link href="/">
+                <a href="/auth/logout">
                   <LogOut className="h-4 w-4 mr-2" />
                   Sign Out
-                </Link>
+                </a>
               </Button>
               <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700">
                 <Save className="h-4 w-4 mr-2" />

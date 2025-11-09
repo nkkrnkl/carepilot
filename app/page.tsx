@@ -48,7 +48,11 @@ export default function LandingPage() {
               hasCheckedRole.current = false; // Allow retry if session becomes valid
               return; // Stay on landing page
             }
-            throw new Error(`API error: ${response.status}`);
+            // For other errors, just show landing page
+            console.error("Error checking user role:", response.status);
+            setCheckingRole(false);
+            hasCheckedRole.current = false; // Allow retry
+            return;
           }
           
           const data = await response.json();
@@ -59,11 +63,26 @@ export default function LandingPage() {
             return;
           }
           
+          // If role is null, user doesn't have a role set yet - redirect to signin
+          if (data.success && data.role === null) {
+            setCheckingRole(false);
+            hasCheckedRole.current = true;
+            window.location.href = "/signin";
+            return;
+          }
+          
           // Check if user exists in database with role
           const userResponse = await fetch(`/api/users?emailAddress=${encodeURIComponent(user.email)}`);
           
           if (!userResponse.ok) {
-            // If error, just show landing page
+            // If 404, user doesn't exist - redirect to signin
+            if (userResponse.status === 404) {
+              setCheckingRole(false);
+              hasCheckedRole.current = true;
+              window.location.href = "/signin";
+              return;
+            }
+            // For other errors, just show landing page
             setCheckingRole(false);
             hasCheckedRole.current = false; // Allow retry
             return;
@@ -79,6 +98,8 @@ export default function LandingPage() {
           
           // User is logged in but has no role - redirect to sign-in page to select role
           // This will show the role selection UI
+          setCheckingRole(false);
+          hasCheckedRole.current = true;
           window.location.href = "/signin";
         } catch (error) {
           console.error("Error checking user role:", error);

@@ -17,7 +17,7 @@ export default function SignUpPage() {
 
   useEffect(() => {
     if (user && !isLoading) {
-      // Check if user has a role set, if not, redirect to role selection
+      // Check if user has a role set, and handle role saving from signup
       checkUserRole();
     }
   }, [user, isLoading]);
@@ -26,18 +26,112 @@ export default function SignUpPage() {
     if (!user?.email) return;
     
     try {
+      console.log("Signup page - User authenticated, checking role for:", user.email);
+      
+      // Check multiple sources for role (in priority order)
+      let roleToUse: "patient" | "doctor" | null = null;
+      
+      // 1. Check sessionStorage and localStorage (for redundancy)
+      const storedRoleSession = sessionStorage.getItem("signupRole");
+      const storedRoleLocal = localStorage.getItem("signupRole");
+      const storedRole = storedRoleSession || storedRoleLocal;
+      if (storedRole === "patient" || storedRole === "doctor") {
+        roleToUse = storedRole;
+        console.log("Signup page - Found role in storage:", roleToUse);
+      }
+      
+      // 2. Check if user already has a role in database
+      const roleApiResponse = await fetch("/api/users/role");
+      const roleApiData = await roleApiResponse.json();
+      
+      console.log("Signup page - Role API response:", roleApiData);
+      
+      if (roleApiData.success && roleApiData.role) {
+        // User already has a role - redirect immediately
+        console.log("Signup page - User has role in database:", roleApiData.role);
+        sessionStorage.removeItem("signupRole");
+        localStorage.removeItem("signupRole");
+        const redirectUrl = roleApiData.role === "doctor" ? "/doctorportal" : "/patient";
+        console.log("Signup page - Redirecting to:", redirectUrl);
+        window.location.href = redirectUrl;
+        return;
+      }
+      
+      // 3. Check user data endpoint
       const response = await fetch(`/api/users?emailAddress=${encodeURIComponent(user.email)}`);
       const data = await response.json();
       
+      console.log("Signup page - User data response:", data);
+      
       if (data.success && data.user?.userRole) {
-        // User has a role, redirect to appropriate dashboard
-        router.push(data.user.userRole === "doctor" ? "/doctorportal" : "/patient");
-      } else {
-        // User doesn't have a role set, show role selection
-        setShowRoleSelection(true);
+        // User has a role in user data
+        console.log("Signup page - User has role in user data:", data.user.userRole);
+        sessionStorage.removeItem("signupRole");
+        localStorage.removeItem("signupRole");
+        const redirectUrl = data.user.userRole === "doctor" ? "/doctorportal" : "/patient";
+        console.log("Signup page - Redirecting to:", redirectUrl);
+        window.location.href = redirectUrl;
+        return;
       }
+      
+      // 4. If we have a stored role but no role in database, save it
+      if (roleToUse) {
+        console.log("Signup page - Saving stored role to database:", roleToUse);
+        
+        try {
+          const roleResponse = await fetch("/api/users/role", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ role: roleToUse }),
+          });
+
+          const roleData = await roleResponse.json();
+          console.log("Signup page - Role save response:", roleData);
+
+          if (roleData.success) {
+            // Clear stored role
+            sessionStorage.removeItem("signupRole");
+            localStorage.removeItem("signupRole");
+            
+            // Wait a moment to ensure database write completes
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Double-check the role was saved
+            const verifyResponse = await fetch("/api/users/role");
+            const verifyData = await verifyResponse.json();
+            console.log("Signup page - Verification response:", verifyData);
+            
+            if (verifyData.success && verifyData.role === roleToUse) {
+              // Redirect to appropriate dashboard using window.location for hard redirect
+              const redirectUrl = roleToUse === "doctor" ? "/doctorportal" : "/patient";
+              console.log("Signup page - Role verified, redirecting to:", redirectUrl);
+              window.location.href = redirectUrl;
+              return;
+            } else {
+              console.error("Signup page - Role verification failed. Expected:", roleToUse, "Got:", verifyData.role);
+              throw new Error(`Role verification failed. Expected: ${roleToUse}, Got: ${verifyData.role || "null"}`);
+            }
+          } else {
+            console.error("Signup page - Failed to save role:", roleData.error);
+            throw new Error(roleData.error || "Failed to save role");
+          }
+        } catch (error: any) {
+          console.error("Signup page - Error saving role:", error);
+          // Show error to user and allow them to try again
+          alert(`Error saving role: ${error.message || "Unknown error"}. Please try selecting your role again.`);
+          setShowRoleSelection(true);
+          return;
+        }
+      }
+      
+      // 5. No role found anywhere - show role selection
+      console.log("Signup page - No role found, showing role selection");
+      setShowRoleSelection(true);
+      
     } catch (error) {
-      console.error("Error checking user role:", error);
+      console.error("Signup page - Error checking user role:", error);
       // On error, show role selection
       setShowRoleSelection(true);
     }
@@ -45,10 +139,23 @@ export default function SignUpPage() {
 
   function handleRoleSelect(role: "patient" | "doctor") {
     setSelectedRole(role);
-    // Store role in sessionStorage to retrieve after Auth0 callback
+    // Store role in sessionStorage AND localStorage (for redundancy)
     sessionStorage.setItem("signupRole", role);
-    // Redirect to Auth0 with role in state parameter
+    localStorage.setItem("signupRole", role);
+    
+    // Also store with timestamp to help debug
+    try {
+      sessionStorage.setItem("signupRoleTimestamp", Date.now().toString());
+    } catch (e) {
+      console.warn("Could not set timestamp:", e);
+    }
+    
+    console.log("Signup: Storing role for signup:", role);
+    console.log("Signup: Redirecting to Auth0...");
+    
+    // Redirect to Auth0 with role parameter
     const authUrl = `/auth/login?screen_hint=signup&role=${role}`;
+    console.log("Signup: Auth URL:", authUrl);
     window.location.href = authUrl;
   }
 

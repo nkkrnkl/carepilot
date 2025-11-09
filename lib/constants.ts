@@ -1,5 +1,6 @@
 import { 
   Beaker,
+  Calendar,
   FileText,
   LucideIcon,
   Stethoscope,
@@ -23,6 +24,14 @@ export const FEATURES: Feature[] = [
     icon: Beaker,
     link: "/features/lab-analysis",
     color: "bg-blue-100 text-blue-600"
+  },
+  {
+    id: "scheduling",
+    title: "Scheduling",
+    description: "Find in-network options, match availability and location, place and confirm appointments, and set prep reminders.",
+    icon: Calendar,
+    link: "/features/scheduling",
+    color: "bg-green-100 text-green-600"
   },
   {
     id: "cases",
@@ -52,6 +61,7 @@ export const ROUTES = {
   OVERVIEW: "/overview",
   FEATURES: {
     LAB_ANALYSIS: "/features/lab-analysis",
+    SCHEDULING: "/features/scheduling",
     CASES: "/features/cases"
   }
 } as const;

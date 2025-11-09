@@ -44,10 +44,10 @@ export function PatientNavbar() {
               </Avatar>
             </Link>
             <Button asChild variant="ghost" size="sm">
-              <Link href="/">
+              <a href="/auth/logout">
                 <LogOut className="h-4 w-4 mr-2" />
                 Sign Out
-              </Link>
+              </a>
             </Button>
           </div>
         </div>

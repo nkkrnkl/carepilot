@@ -1,6 +1,7 @@
 /**
  * Auth0 client instance for server-side use
  * Auth0 SDK v4 uses Auth0Client class for all server-side operations
+ * This matches the implementation from the combine-aymaan-niki-abhinavlabs branch.
  */
 
 import { Auth0Client } from "@auth0/nextjs-auth0/server";

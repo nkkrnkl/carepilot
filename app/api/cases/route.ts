@@ -35,6 +35,8 @@ import { CasesResponse } from "@/lib/types/cases";
  * }
  */
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -70,4 +72,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-

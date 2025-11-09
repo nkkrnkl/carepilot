@@ -157,11 +157,14 @@ export interface UserEntity {
   FirstName: string;
   LastName: string;
   DateOfBirth: string; // Date string
+  PhoneNumber?: string; // User's phone number
   StreetAddress: string;
   PatientCity: string;
   PatientState: string;
   providerId?: string;
   insurerId?: string;
+  InsuranceCompanyName?: string; // Insurance company name (e.g., "Blue Cross Blue Shield")
+  InsuranceAccountNumber?: string; // Insurance account number
   InsuranceGroupNumber?: string;
   InsurancePlanType: string; // 'HMO' | 'PPO' | 'EPO' | 'POS' | 'HDHP' | 'Other'
   InsuranceCompanyStreetAddress?: string;
@@ -299,15 +302,31 @@ export async function createUser(user: Omit<UserEntity, "created_at" | "updated_
   const pool = await getConnectionPool();
   const request = pool.request();
   
+  // Convert DateOfBirth string to Date object for SQL Server
+  let dateOfBirth: Date;
+  if (typeof user.DateOfBirth === 'string') {
+    dateOfBirth = new Date(user.DateOfBirth);
+    if (isNaN(dateOfBirth.getTime())) {
+      throw new Error(`Invalid DateOfBirth format: ${user.DateOfBirth}`);
+    }
+  } else if (user.DateOfBirth instanceof Date) {
+    dateOfBirth = user.DateOfBirth;
+  } else {
+    throw new Error(`DateOfBirth must be a string or Date object, got: ${typeof user.DateOfBirth}`);
+  }
+  
   request.input("emailAddress", sql.NVarChar, user.emailAddress);
   request.input("FirstName", sql.NVarChar, user.FirstName);
   request.input("LastName", sql.NVarChar, user.LastName);
-  request.input("DateOfBirth", sql.Date, user.DateOfBirth);
+  request.input("DateOfBirth", sql.Date, dateOfBirth);
+  request.input("PhoneNumber", sql.NVarChar, user.PhoneNumber || null);
   request.input("StreetAddress", sql.NVarChar, user.StreetAddress);
   request.input("PatientCity", sql.NVarChar, user.PatientCity);
   request.input("PatientState", sql.NVarChar, user.PatientState);
   request.input("providerId", sql.NVarChar, user.providerId || null);
   request.input("insurerId", sql.NVarChar, user.insurerId || null);
+  request.input("InsuranceCompanyName", sql.NVarChar, user.InsuranceCompanyName || null);
+  request.input("InsuranceAccountNumber", sql.NVarChar, user.InsuranceAccountNumber || null);
   request.input("InsuranceGroupNumber", sql.NVarChar, user.InsuranceGroupNumber || null);
   request.input("InsurancePlanType", sql.NVarChar, user.InsurancePlanType);
   request.input("InsuranceCompanyStreetAddress", sql.NVarChar, user.InsuranceCompanyStreetAddress || null);
@@ -319,14 +338,14 @@ export async function createUser(user: Omit<UserEntity, "created_at" | "updated_
   
   await request.query(`
     INSERT INTO user_table (
-      emailAddress, FirstName, LastName, DateOfBirth, StreetAddress, PatientCity, PatientState,
-      providerId, insurerId, InsuranceGroupNumber, InsurancePlanType,
+      emailAddress, FirstName, LastName, DateOfBirth, PhoneNumber, StreetAddress, PatientCity, PatientState,
+      providerId, insurerId, InsuranceCompanyName, InsuranceAccountNumber, InsuranceGroupNumber, InsurancePlanType,
       InsuranceCompanyStreetAddress, InsuranceCompanyCity, InsuranceCompanyState, InsuranceCompanyPhoneNumber,
       documents, userRole
     )
     VALUES (
-      @emailAddress, @FirstName, @LastName, @DateOfBirth, @StreetAddress, @PatientCity, @PatientState,
-      @providerId, @insurerId, @InsuranceGroupNumber, @InsurancePlanType,
+      @emailAddress, @FirstName, @LastName, @DateOfBirth, @PhoneNumber, @StreetAddress, @PatientCity, @PatientState,
+      @providerId, @insurerId, @InsuranceCompanyName, @InsuranceAccountNumber, @InsuranceGroupNumber, @InsurancePlanType,
       @InsuranceCompanyStreetAddress, @InsuranceCompanyCity, @InsuranceCompanyState, @InsuranceCompanyPhoneNumber,
       @documents, @userRole
     )
@@ -360,12 +379,39 @@ export async function updateUser(
   request.input("emailAddress", sql.NVarChar, emailAddress);
   
   const updateFields: string[] = [];
-  const updateValues: { [key: string]: any } = {};
   
   Object.entries(updates).forEach(([key, value]) => {
-    if (value !== undefined) {
+    // Skip undefined values, but allow null and empty strings for optional fields
+    // However, userRole should always be updated if provided (even if empty string should be converted to null)
+    if (value === undefined) {
+      return;
+    }
+    
+    // For userRole, always update if provided (even if it's null or empty string)
+    if (key === "userRole") {
       updateFields.push(`${key} = @${key}`);
-      request.input(key, sql.NVarChar(sql.MAX), value);
+      // Convert empty string to null for userRole
+      const finalValue = value === "" ? null : value;
+      request.input(key, sql.NVarChar, finalValue);
+      return;
+    }
+    
+    // For other fields, skip null and empty strings (unless they're explicitly set)
+    if (value !== null && value !== "") {
+      updateFields.push(`${key} = @${key}`);
+      // Handle DateOfBirth as a Date type
+      if (key === "DateOfBirth") {
+        // Convert string to Date object for SQL Server
+        const dateValue = typeof value === 'string' ? new Date(value) : value;
+        if (!(dateValue instanceof Date) || isNaN(dateValue.getTime())) {
+          console.error(`Invalid DateOfBirth value: ${value}`);
+          updateFields.pop(); // Remove the field we just added
+          return; // Skip this field if date is invalid
+        }
+        request.input(key, sql.Date, dateValue);
+      } else {
+        request.input(key, sql.NVarChar(sql.MAX), value);
+      }
     }
   });
   

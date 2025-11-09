@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useUser } from '@auth0/nextjs-auth0/client';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -167,6 +168,7 @@ const getTypeIcon = (type: string) => {
 };
 
 export default function CasesPage() {
+  const { user } = useUser();
   const [selectedCase, setSelectedCase] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>("All");
   const [cases, setCases] = useState<CaseData[]>([]);
@@ -175,7 +177,8 @@ export default function CasesPage() {
   const [loading, setLoading] = useState(true);
   const [loadingCase, setLoadingCase] = useState(false);
 
-  const userId = "user-123"; // TODO: Get from authentication context
+  // Use authenticated user's email as userId, fallback to "user-123" if not available
+  const userId = user?.email || "user-123";
 
   // Fetch cases on component mount
   useEffect(() => {

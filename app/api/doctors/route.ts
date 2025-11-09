@@ -12,21 +12,77 @@ export const dynamic = 'force-dynamic';
  * Convert SQL doctor entity to API response format
  */
 function formatDoctorForApi(doctor: DoctorEntity) {
+  // Safely parse JSON fields with error handling
+  let languages: string[] = [];
+  if (doctor.languages) {
+    if (Array.isArray(doctor.languages)) {
+      languages = doctor.languages;
+    } else if (typeof doctor.languages === 'string') {
+      try {
+        languages = JSON.parse(doctor.languages);
+        if (!Array.isArray(languages)) {
+          console.warn(`Languages for doctor ${doctor.id} is not an array:`, languages);
+          languages = [];
+        }
+      } catch (e) {
+        console.warn(`Failed to parse languages for doctor ${doctor.id}:`, e);
+        languages = [];
+      }
+    }
+  }
+  
+  let slots: DoctorSlot[] = [];
+  if (doctor.slots) {
+    if (Array.isArray(doctor.slots)) {
+      slots = doctor.slots;
+    } else if (typeof doctor.slots === 'string') {
+      try {
+        const parsed = JSON.parse(doctor.slots);
+        slots = Array.isArray(parsed) ? parsed : [];
+        if (!Array.isArray(slots)) {
+          console.warn(`Slots for doctor ${doctor.id} is not an array:`, parsed);
+          slots = [];
+        }
+      } catch (e) {
+        console.warn(`Failed to parse slots for doctor ${doctor.id}:`, e);
+        slots = [];
+      }
+    }
+  }
+  
+  let reasons: string[] = [];
+  if (doctor.reasons) {
+    if (Array.isArray(doctor.reasons)) {
+      reasons = doctor.reasons;
+    } else if (typeof doctor.reasons === 'string') {
+      try {
+        reasons = JSON.parse(doctor.reasons);
+        if (!Array.isArray(reasons)) {
+          console.warn(`Reasons for doctor ${doctor.id} is not an array:`, reasons);
+          reasons = [];
+        }
+      } catch (e) {
+        console.warn(`Failed to parse reasons for doctor ${doctor.id}:`, e);
+        reasons = [];
+      }
+    }
+  }
+  
   return {
     id: doctor.id,
     name: doctor.name,
     specialty: doctor.specialty,
     address: doctor.address,
-    distance: doctor.distance,
-    travelTime: doctor.travelTime,
-    languages: doctor.languages ? JSON.parse(doctor.languages) : [],
-    telehealth: doctor.telehealth,
-    inNetwork: doctor.inNetwork,
-    rating: doctor.rating,
-    image: doctor.image,
-    slots: doctor.slots ? JSON.parse(doctor.slots) as DoctorSlot[] : [],
-    reasons: doctor.reasons ? JSON.parse(doctor.reasons) : [],
-    estimatedCost: doctor.estimatedCost,
+    distance: doctor.distance || null,
+    travelTime: doctor.travelTime || null,
+    languages,
+    telehealth: doctor.telehealth || false,
+    inNetwork: doctor.inNetwork || false,
+    rating: doctor.rating || null,
+    image: doctor.image || null,
+    slots,
+    reasons,
+    estimatedCost: doctor.estimatedCost || null,
     createdAt: doctor.createdAt,
     updatedAt: doctor.updatedAt,
   };
@@ -92,12 +148,17 @@ export async function GET(request: Request) {
     // Format doctors for API response
     const formattedDoctors = doctors.map(formatDoctorForApi);
     
+    // Log for debugging
+    console.log(`✅ Fetched ${formattedDoctors.length} doctors from Azure SQL Database (K2Database.doctorInformation_table)`);
+    
     // Return doctors data
     return NextResponse.json({
       success: true,
       count: formattedDoctors.length,
       data: formattedDoctors,
-      source: "azure-sql-database"
+      source: "azure-sql-database",
+      database: process.env.AZURE_SQL_DATABASE || "K2Database",
+      table: "doctorInformation_table"
     });
     
   } catch (error: any) {

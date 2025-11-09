@@ -38,9 +38,8 @@ export async function getCases(userId: string = "user-123"): Promise<CaseData[]>
  * Fetch EOB data for a specific document
  */
 export async function getEOBData(
-  userId: string,
   documentId: string,
-  docType: string = "eob"
+  userId: string = "user-123"
 ): Promise<EOBExtractionResult | null> {
   try {
     const response = await fetch("/api/eob/extract", {
@@ -51,7 +50,7 @@ export async function getEOBData(
       body: JSON.stringify({
         userId,
         documentId,
-        docType,
+        docType: "eob",
       }),
     });
 
@@ -74,4 +73,3 @@ export async function getEOBData(
     return null;
   }
 }
-

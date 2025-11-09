@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,10 +21,13 @@ import {
   Mail,
   Phone,
   Shield,
-  FileText
+  FileText,
+  Loader2
 } from "lucide-react";
+import { Toaster, toast } from "sonner";
 
 export default function ProfilePage() {
+  const { user } = useUser();
   const dashboardUrl = useDashboardUrl();
   const [formData, setFormData] = useState({
     // Personal Information
@@ -52,14 +55,203 @@ export default function ProfilePage() {
   });
 
   const [isSaved, setIsSaved] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Load user data on mount
+  useEffect(() => {
+    async function loadUserData() {
+      if (!user?.email) {
+        setIsLoadingData(false);
+        return;
+      }
+
+      try {
+        setIsLoadingData(true);
+        const response = await fetch(`/api/users?emailAddress=${encodeURIComponent(user.email)}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.user) {
+            // Map database fields to form fields
+            const userData = data.user;
+            
+            // Format DateOfBirth for HTML date input (YYYY-MM-DD format)
+            let dateOfBirthFormatted = "";
+            if (userData.DateOfBirth) {
+              try {
+                const dateObj = userData.DateOfBirth instanceof Date 
+                  ? userData.DateOfBirth 
+                  : new Date(userData.DateOfBirth);
+                if (!isNaN(dateObj.getTime())) {
+                  // Format as YYYY-MM-DD for HTML date input
+                  dateOfBirthFormatted = dateObj.toISOString().split('T')[0];
+                }
+              } catch (e) {
+                console.error("Error formatting DateOfBirth:", e);
+              }
+            }
+            
+            setFormData({
+              firstName: userData.FirstName || "",
+              lastName: userData.LastName || "",
+              dateOfBirth: dateOfBirthFormatted,
+              email: userData.emailAddress || user.email || "",
+              phone: userData.PhoneNumber || "",
+              address: userData.StreetAddress || "",
+              city: userData.PatientCity || "",
+              state: userData.PatientState || "",
+              zipCode: userData.zipCode || "",
+              preferredLanguage: userData.preferredLanguage || "English",
+              insuranceCompany: userData.InsuranceCompanyName || "",
+              insuranceAccountNumber: userData.InsuranceAccountNumber || "",
+              insuranceGroupNumber: userData.InsuranceGroupNumber || "",
+              insurancePlanType: (userData.InsurancePlanType || "").toLowerCase(),
+              insuranceCompanyAddress: userData.InsuranceCompanyStreetAddress || "",
+              insuranceCompanyCity: userData.InsuranceCompanyCity || "",
+              insuranceCompanyState: userData.InsuranceCompanyState || "",
+              insuranceCompanyZipCode: userData.InsuranceCompanyZipCode || "",
+              insuranceCompanyPhone: userData.InsuranceCompanyPhoneNumber || "",
+            });
+          } else {
+            // User doesn't exist yet, set email from Auth0
+            console.log("User profile not found - user can fill out their profile");
+            setFormData(prev => ({ ...prev, email: user.email || "" }));
+          }
+        } else if (response.status === 404) {
+          // User doesn't exist in database yet - this is normal for new users
+          console.log("User profile not found in database - this is normal for new users");
+          setFormData(prev => ({ ...prev, email: user.email || "" }));
+        } else {
+          // Other error (500, etc.)
+          console.error("Failed to load user data:", response.status, response.statusText);
+          setFormData(prev => ({ ...prev, email: user.email || "" }));
+        }
+      } catch (error) {
+        console.error("Error loading user data:", error);
+        // Don't show error to user - just allow them to fill out the form
+        setFormData(prev => ({ ...prev, email: user.email || "" }));
+      } finally {
+        setIsLoadingData(false);
+      }
+    }
+
+    loadUserData();
+  }, [user]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, this would save to backend
-    console.log("Saving profile:", formData);
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 3000);
-    // Here you would typically call an API to save the data
+    setError(null);
+    setIsLoading(true);
+
+    if (!user?.email) {
+      setError("You must be logged in to save your profile");
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      // Map form fields to database field names
+      // Normalize InsurancePlanType: convert lowercase to uppercase, or default to "Other"
+      let insurancePlanType = formData.insurancePlanType;
+      if (!insurancePlanType || insurancePlanType === "") {
+        insurancePlanType = "Other";
+      } else {
+        // Convert to uppercase (hmo -> HMO, ppo -> PPO, etc.)
+        insurancePlanType = insurancePlanType.toUpperCase();
+      }
+
+      const userData = {
+        emailAddress: user.email,
+        FirstName: formData.firstName,
+        LastName: formData.lastName,
+        DateOfBirth: formData.dateOfBirth,
+        PhoneNumber: formData.phone || undefined,
+        StreetAddress: formData.address,
+        PatientCity: formData.city,
+        PatientState: formData.state,
+        InsuranceCompanyName: formData.insuranceCompany || undefined,
+        InsuranceAccountNumber: formData.insuranceAccountNumber || undefined,
+        InsuranceGroupNumber: formData.insuranceGroupNumber || undefined,
+        InsurancePlanType: insurancePlanType, // Always set (defaults to "Other")
+        InsuranceCompanyStreetAddress: formData.insuranceCompanyAddress || undefined,
+        InsuranceCompanyCity: formData.insuranceCompanyCity || undefined,
+        InsuranceCompanyState: formData.insuranceCompanyState || undefined,
+        InsuranceCompanyPhoneNumber: formData.insuranceCompanyPhone || undefined,
+      };
+
+      // First, check if user exists
+      console.log("Checking if user exists:", user.email);
+      const checkResponse = await fetch(`/api/users?emailAddress=${encodeURIComponent(user.email)}`);
+      const checkData = await checkResponse.json();
+      console.log("User check response:", checkData);
+      
+      let response;
+      if (checkData.success && checkData.user) {
+        // User exists, update them
+        console.log("User exists, updating:", userData);
+        response = await fetch("/api/users", {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(userData),
+        });
+      } else {
+        // User doesn't exist, create them
+        // POST requires all required fields
+        if (!userData.FirstName || !userData.LastName || !userData.DateOfBirth || 
+            !userData.StreetAddress || !userData.PatientCity || !userData.PatientState) {
+          const missingFields = [];
+          if (!userData.FirstName) missingFields.push("First Name");
+          if (!userData.LastName) missingFields.push("Last Name");
+          if (!userData.DateOfBirth) missingFields.push("Date of Birth");
+          if (!userData.StreetAddress) missingFields.push("Address");
+          if (!userData.PatientCity) missingFields.push("City");
+          if (!userData.PatientState) missingFields.push("State");
+          
+          const errorMsg = `Please fill in all required fields: ${missingFields.join(", ")}`;
+          setError(errorMsg);
+          toast.error(errorMsg);
+          setIsLoading(false);
+          return;
+        }
+        
+        console.log("User doesn't exist, creating:", userData);
+        response = await fetch("/api/users", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(userData),
+        });
+      }
+
+      console.log("Save response status:", response.status);
+      const data = await response.json();
+      console.log("Save response data:", data);
+
+      if (response.ok && data.success) {
+        setIsSaved(true);
+        toast.success("Profile saved successfully!");
+        setTimeout(() => setIsSaved(false), 3000);
+        // Reload user data to show updated information
+        window.location.reload();
+      } else {
+        const errorMsg = data.error || "Failed to save profile";
+        console.error("Save error:", errorMsg);
+        setError(errorMsg);
+        toast.error(errorMsg);
+      }
+    } catch (error) {
+      console.error("Error saving profile:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to save profile";
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleChange = (field: string, value: string) => {
@@ -68,6 +260,7 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-blue-100/20">
+      <Toaster />
       {/* Navigation */}
       <nav className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -103,8 +296,26 @@ export default function ProfilePage() {
         </div>
       )}
 
+      {/* Error Banner */}
+      {error && (
+        <div className="bg-red-50 border-b border-red-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex items-center gap-2 text-red-800">
+              <AlertCircle className="h-5 w-5" />
+              <span className="font-medium">{error}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <form onSubmit={handleSubmit}>
+        {isLoadingData ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            <span className="ml-3 text-gray-600">Loading profile data...</span>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit}>
           {/* Personal Information Section */}
           <Card className="mb-6 border-2 overflow-hidden py-0">
             <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-b px-6 py-4">
@@ -186,8 +397,10 @@ export default function ProfilePage() {
                     type="email"
                     placeholder="john.doe@example.com"
                     value={formData.email}
-                    onChange={(e) => handleChange("email", e.target.value)}
+                    disabled
+                    className="bg-gray-50 cursor-not-allowed"
                   />
+                  <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-700 mb-2 block flex items-center gap-2">
@@ -397,12 +610,23 @@ export default function ProfilePage() {
               type="submit" 
               size="lg" 
               className="bg-blue-600 hover:bg-blue-700 text-white px-8"
+              disabled={isLoading || isLoadingData}
             >
-              <Save className="h-4 w-4 mr-2" />
-              Save Profile
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Profile
+                </>
+              )}
             </Button>
           </div>
         </form>
+        )}
       </div>
     </div>
   );
