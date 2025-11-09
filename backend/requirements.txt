@@ -19,6 +19,9 @@ azure-identity
 azure-core
 numpy
 
+# Azure Computer Vision - Image Analysis 4.0 API for READ feature
+azure-ai-vision-imageanalysis
+
 # Vector Database - Pinecone (Direct API)
 
 # LangGraph and LangChain (for agent workflows)

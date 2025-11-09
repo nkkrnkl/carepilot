@@ -36,11 +36,10 @@ export function PreviousReports({
   async function fetchReports() {
     try {
       setLoading(true);
-      const response = await fetch(`/api/labs/reports?userId=${userId}`);
+      const response = await fetch(`/api/labs/list?userId=${userId}`);
       if (response.ok) {
         const data = await response.json();
-        // The API returns { success: true, reports: [...] }
-        setReports(data.reports || []);
+        setReports(data);
       }
     } catch (error) {
       console.error("Failed to fetch reports:", error);

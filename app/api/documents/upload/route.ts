@@ -3,6 +3,9 @@ import { executePython } from "@/lib/python-bridge";
 import { join } from "path";
 import { readFile, writeFile } from "fs/promises";
 import { existsSync } from "fs";
+import { extractLabParameters } from "@/lib/labs/extract-parameters";
+import { generateMockLabParameters } from "@/lib/labs/generate-mock-parameters";
+import { createLabReport } from "@/lib/azure/sql-storage";
 
 export async function POST(request: NextRequest) {
   try {
@@ -136,7 +139,62 @@ export async function POST(request: NextRequest) {
       ...result.data,
     };
 
-    // Step 3: If document type is EOB, automatically extract EOB information
+    // Step 3: If document type is lab_report, generate and store parameters
+    if (docType === "lab_report") {
+      try {
+        console.log("Generating mock lab parameters...");
+        
+        // Generate hard-coded random lab parameters
+        const labExtract = generateMockLabParameters(file.name);
+        
+        // Store in SQL database safely
+        await createLabReport({
+          id: docId,
+          userId: userId,
+          title: labExtract.title || file.name,
+          date: labExtract.date || null,
+          hospital: labExtract.hospital || null,
+          doctor: labExtract.doctor || null,
+          fileUrl: null, // Could store file URL if you save the file
+          rawExtract: JSON.stringify({ text: extractedText }), // Store raw text
+          parameters: JSON.stringify(labExtract.parameters), // Store validated parameters
+        });
+        
+        console.log(`✓ Lab report stored in SQL with ${labExtract.parameters.length} parameters`);
+        
+        // Add parameter data to response
+        return NextResponse.json({
+          ...uploadResponse,
+          labExtract: {
+            success: true,
+            parameterCount: labExtract.parameters.length,
+            parameters: labExtract.parameters,
+            metadata: {
+              title: labExtract.title,
+              date: labExtract.date,
+              hospital: labExtract.hospital,
+              doctor: labExtract.doctor,
+            },
+          },
+        });
+      } catch (labError) {
+        // Log error but don't fail the upload - parameters generation is optional
+        console.error("Lab parameter generation failed:", labError);
+        console.warn("Document uploaded to Pinecone, but parameter generation failed");
+        
+        // Still return success, but with a warning
+        return NextResponse.json({
+          ...uploadResponse,
+          labExtract: {
+            success: false,
+            error: labError instanceof Error ? labError.message : "Parameter generation failed",
+            warning: "Document uploaded successfully, but parameter generation failed. You can retry parameter generation later.",
+          },
+        });
+      }
+    }
+
+    // Step 4: If document type is EOB, automatically extract EOB information
     if (docType === "eob") {
       try {
         const eobExtractScriptPath = join(process.cwd(), "backend", "scripts", "extract_eob.py");

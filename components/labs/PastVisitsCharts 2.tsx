@@ -13,7 +13,6 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  ReferenceLine,
 } from "recharts";
 
 interface LabParameter {
@@ -29,12 +28,6 @@ interface LabReport {
   parameters: Record<string, LabParameter>;
 }
 
-interface ParameterSeries {
-  dataPoints: TimeSeriesDataPoint[];
-  referenceRange?: { min: number | null; max: number | null };
-  unit?: string | null;
-}
-
 interface PastVisitsChartsProps {
   userId?: string;
 }
@@ -45,47 +38,8 @@ interface TimeSeriesDataPoint {
   unit?: string | null;
 }
 
-/**
- * Parse reference range string and extract min/max values
- */
-function parseReferenceRange(rangeStr: string): { min: number | null; max: number | null } | null {
-  if (!rangeStr) return null;
-  
-  let cleaned = rangeStr.trim().replace(/^(range|ref|reference):?\s*/i, "");
-  
-  // Handle "< value" format (upper limit only)
-  const lessThanMatch = cleaned.match(/^<\s*([\d.]+)/i);
-  if (lessThanMatch) {
-    return { min: null, max: parseFloat(lessThanMatch[1]) };
-  }
-  
-  // Handle "> value" format (lower limit only)
-  const greaterThanMatch = cleaned.match(/^>\s*([\d.]+)/i);
-  if (greaterThanMatch) {
-    return { min: parseFloat(greaterThanMatch[1]), max: null };
-  }
-  
-  // Handle "value1 - value2" or "value1-value2" format
-  const rangeMatch = cleaned.match(/([\d.]+)\s*[-–—]\s*([\d.]+)/);
-  if (rangeMatch) {
-    return {
-      min: parseFloat(rangeMatch[1]),
-      max: parseFloat(rangeMatch[2])
-    };
-  }
-  
-  // Try to extract numbers if format is unclear
-  const numbers = cleaned.match(/[\d.]+/g);
-  if (numbers && numbers.length >= 2) {
-    const nums = numbers.map(n => parseFloat(n)).sort((a, b) => a - b);
-    return { min: nums[0], max: nums[nums.length - 1] };
-  }
-  
-  return null;
-}
-
 export function PastVisitsCharts({ userId = "demo-user" }: PastVisitsChartsProps) {
-  const [timeSeries, setTimeSeries] = useState<Record<string, ParameterSeries>>({});
+  const [timeSeries, setTimeSeries] = useState<Record<string, TimeSeriesDataPoint[]>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -95,52 +49,48 @@ export function PastVisitsCharts({ userId = "demo-user" }: PastVisitsChartsProps
   async function fetchTimeSeries() {
     try {
       setLoading(true);
-      const response = await fetch(`/api/labs/reports?userId=${userId}`);
-      if (!response.ok) {
-        console.error("Failed to fetch reports:", response.statusText);
-        return;
-      }
+      const response = await fetch(`/api/labs/list?userId=${userId}`);
+      if (!response.ok) return;
 
-      const data = await response.json();
-      // The API returns { success: true, reports: [...] }
-      const reports: LabReport[] = data.reports || [];
+      const reports: LabReport[] = await response.json();
+
+      // Fetch full data for each report
+      const fullReports = await Promise.all(
+        reports.map(async (report) => {
+          const detailResponse = await fetch(`/api/labs/get?id=${report.id}`);
+          if (detailResponse.ok) {
+            return await detailResponse.json();
+          }
+          return null;
+        })
+      );
 
       // Build time series per parameter
-      // Group parameters by name across all visits
-      const series: Record<string, ParameterSeries> = {};
+      const series: Record<string, TimeSeriesDataPoint[]> = {};
 
-      reports.forEach((report) => {
-        if (!report || !report.parameters || !report.date) return;
+      fullReports.forEach((report) => {
+        if (!report || !report.parameters) return;
 
         Object.entries(report.parameters).forEach(([paramName, param]: [string, any]) => {
           // Only include numeric values
-          const numValue = typeof param.value === "number" ? param.value : parseFloat(String(param.value));
+          const numValue = typeof param.value === "number" ? param.value : parseFloat(param.value);
           if (isNaN(numValue) || !isFinite(numValue)) return;
 
           if (!series[paramName]) {
-            series[paramName] = {
-              dataPoints: [],
-              referenceRange: undefined,
-              unit: param.unit || null,
-            };
+            series[paramName] = [];
           }
 
-          series[paramName].dataPoints.push({
+          series[paramName].push({
             date: report.date,
             value: numValue,
-            unit: param.unit || null,
+            unit: param.unit,
           });
-
-          // Store reference range from first occurrence
-          if (!series[paramName].referenceRange && param.referenceRange) {
-            series[paramName].referenceRange = parseReferenceRange(param.referenceRange);
-          }
         });
       });
 
       // Sort each series by date
       Object.keys(series).forEach((paramName) => {
-        series[paramName].dataPoints.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        series[paramName].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       });
 
       setTimeSeries(series);
@@ -177,7 +127,7 @@ export function PastVisitsCharts({ userId = "demo-user" }: PastVisitsChartsProps
     );
   }
 
-  const chartEntries = Object.entries(timeSeries).filter(([, series]) => series.dataPoints.length >= 2);
+  const chartEntries = Object.entries(timeSeries).filter(([, data]) => data.length >= 2);
 
   if (chartEntries.length === 0) {
     return (
@@ -194,8 +144,7 @@ export function PastVisitsCharts({ userId = "demo-user" }: PastVisitsChartsProps
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {chartEntries.map(([paramName, series]) => {
-        const { dataPoints, referenceRange, unit } = series;
+      {chartEntries.map(([paramName, dataPoints]) => {
         const unitsVary = checkUnitsVary(dataPoints);
         const chartData = dataPoints.map((dp) => ({
           date: formatDate(dp.date),
@@ -214,16 +163,9 @@ export function PastVisitsCharts({ userId = "demo-user" }: PastVisitsChartsProps
                   </Badge>
                 )}
               </div>
-              <div className="flex items-center gap-4 mt-2">
-                {unit && !unitsVary && (
-                  <CardDescription>Unit: {unit}</CardDescription>
-                )}
-                {referenceRange && (
-                  <CardDescription className="text-xs">
-                    Range: {referenceRange.min !== null ? referenceRange.min : "—"} - {referenceRange.max !== null ? referenceRange.max : "—"}
-                  </CardDescription>
-                )}
-              </div>
+              {dataPoints[0]?.unit && !unitsVary && (
+                <CardDescription>Unit: {dataPoints[0].unit}</CardDescription>
+              )}
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
@@ -239,23 +181,6 @@ export function PastVisitsCharts({ userId = "demo-user" }: PastVisitsChartsProps
                   <YAxis tick={{ fontSize: 12 }} />
                   <Tooltip />
                   <Legend />
-                  {/* Reference range lines */}
-                  {referenceRange?.min !== null && (
-                    <ReferenceLine
-                      y={referenceRange.min}
-                      stroke="#10b981"
-                      strokeDasharray="5 5"
-                      label={{ value: "Min", position: "right", fill: "#10b981" }}
-                    />
-                  )}
-                  {referenceRange?.max !== null && (
-                    <ReferenceLine
-                      y={referenceRange.max}
-                      stroke="#ef4444"
-                      strokeDasharray="5 5"
-                      label={{ value: "Max", position: "right", fill: "#ef4444" }}
-                    />
-                  )}
                   <Line
                     type="monotone"
                     dataKey="value"

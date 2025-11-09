@@ -681,3 +681,163 @@ export async function deleteAppointment(appointmentId: string): Promise<void> {
   `);
 }
 
+// ============================================================================
+// LAB REPORT OPERATIONS
+// ============================================================================
+
+export interface LabReportEntity {
+  id: string;
+  userId: string;
+  title?: string | null;
+  date?: string | null;
+  hospital?: string | null;
+  doctor?: string | null;
+  fileUrl?: string | null;
+  rawExtract?: string | null; // JSON string
+  parameters?: string | null; // JSON string
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * Create a new lab report in SQL database
+ * Safely stores parameter data with validation
+ */
+export async function createLabReport(
+  report: Omit<LabReportEntity, "createdAt" | "updatedAt">
+): Promise<void> {
+  const pool = await getConnectionPool();
+  const request = pool.request();
+  
+  request.input("id", sql.NVarChar, report.id);
+  request.input("userId", sql.NVarChar, report.userId);
+  request.input("title", sql.NVarChar, report.title || null);
+  request.input("date", sql.NVarChar, report.date || null);
+  request.input("hospital", sql.NVarChar, report.hospital || null);
+  request.input("doctor", sql.NVarChar, report.doctor || null);
+  request.input("fileUrl", sql.NVarChar(sql.MAX), report.fileUrl || null);
+  request.input("rawExtract", sql.NVarChar(sql.MAX), report.rawExtract || null);
+  request.input("parameters", sql.NVarChar(sql.MAX), report.parameters || null);
+  
+  await request.query(`
+    INSERT INTO LabReport (
+      id, userId, title, date, hospital, doctor, fileUrl, rawExtract, parameters
+    )
+    VALUES (
+      @id, @userId, @title, @date, @hospital, @doctor, @fileUrl, @rawExtract, @parameters
+    )
+  `);
+}
+
+/**
+ * Get lab report by ID
+ */
+export async function getLabReportById(id: string): Promise<LabReportEntity | null> {
+  const pool = await getConnectionPool();
+  const request = pool.request();
+  
+  request.input("id", sql.NVarChar, id);
+  
+  const result = await request.query(`
+    SELECT * FROM LabReport WHERE id = @id
+  `);
+  
+  if (result.recordset.length === 0) {
+    return null;
+  }
+  
+  return result.recordset[0] as LabReportEntity;
+}
+
+/**
+ * List all lab reports for a user (newest first)
+ */
+export async function listLabReportsByUser(userId: string): Promise<LabReportEntity[]> {
+  const pool = await getConnectionPool();
+  const request = pool.request();
+  
+  request.input("userId", sql.NVarChar, userId);
+  
+  const result = await request.query(`
+    SELECT * FROM LabReport 
+    WHERE userId = @userId 
+    ORDER BY date DESC, createdAt DESC
+  `);
+  
+  return result.recordset as LabReportEntity[];
+}
+
+/**
+ * Update lab report
+ */
+export async function updateLabReport(
+  id: string,
+  updates: Partial<Omit<LabReportEntity, "id" | "userId" | "createdAt" | "updatedAt">>
+): Promise<void> {
+  const pool = await getConnectionPool();
+  const request = pool.request();
+  
+  request.input("id", sql.NVarChar, id);
+  
+  const updateFields: string[] = [];
+  
+  if (updates.title !== undefined) {
+    request.input("title", sql.NVarChar, updates.title);
+    updateFields.push("title = @title");
+  }
+  
+  if (updates.date !== undefined) {
+    request.input("date", sql.NVarChar, updates.date);
+    updateFields.push("date = @date");
+  }
+  
+  if (updates.hospital !== undefined) {
+    request.input("hospital", sql.NVarChar, updates.hospital);
+    updateFields.push("hospital = @hospital");
+  }
+  
+  if (updates.doctor !== undefined) {
+    request.input("doctor", sql.NVarChar, updates.doctor);
+    updateFields.push("doctor = @doctor");
+  }
+  
+  if (updates.fileUrl !== undefined) {
+    request.input("fileUrl", sql.NVarChar(sql.MAX), updates.fileUrl);
+    updateFields.push("fileUrl = @fileUrl");
+  }
+  
+  if (updates.rawExtract !== undefined) {
+    request.input("rawExtract", sql.NVarChar(sql.MAX), updates.rawExtract);
+    updateFields.push("rawExtract = @rawExtract");
+  }
+  
+  if (updates.parameters !== undefined) {
+    request.input("parameters", sql.NVarChar(sql.MAX), updates.parameters);
+    updateFields.push("parameters = @parameters");
+  }
+  
+  if (updateFields.length === 0) {
+    return; // No updates
+  }
+  
+  await request.query(`
+    UPDATE LabReport 
+    SET ${updateFields.join(", ")}, updatedAt = GETUTCDATE()
+    WHERE id = @id
+  `);
+}
+
+/**
+ * Delete lab report
+ */
+export async function deleteLabReport(id: string): Promise<void> {
+  const pool = await getConnectionPool();
+  const request = pool.request();
+  
+  request.input("id", sql.NVarChar, id);
+  
+  await request.query(`
+    DELETE FROM LabReport WHERE id = @id
+  `);
+}
+

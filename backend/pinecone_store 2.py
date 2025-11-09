@@ -21,8 +21,7 @@ from urllib.parse import urlparse
 from dotenv import load_dotenv
 from pinecone import Pinecone, ServerlessSpec
 from openai import AzureOpenAI
-# Lazy import DefaultAzureCredential - only needed when use_azure_ad=True
-# import DefaultAzureCredential  # Moved to lazy import to avoid architecture issues
+from azure.identity import DefaultAzureCredential
 import uuid
 import hashlib
 
@@ -151,8 +150,6 @@ class PineconeVectorStore:
         # Initialize Azure OpenAI client with API key or Azure AD
         if self.use_azure_ad:
             # Use Azure AD authentication (recommended for production)
-            # Lazy import to avoid architecture mismatch issues
-            from azure.identity import DefaultAzureCredential
             credential = DefaultAzureCredential()
             self.azure_client = AzureOpenAI(
                 credential=credential,

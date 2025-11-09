@@ -38,17 +38,19 @@ export default function LabsPage() {
     } else {
       setSelectedReport(null);
     }
-  }, [selectedReportId]);
+  }, [selectedReportId, userId]);
 
   async function loadReport(reportId: string) {
     try {
       setLoading(true);
-      const response = await fetch(`/api/labs/get?id=${reportId}`);
+      const response = await fetch(`/api/labs/reports?id=${reportId}&userId=${userId}`);
       if (response.ok) {
         const data = await response.json();
-        setSelectedReport(data);
+        // The API returns { success: true, report: {...} }
+        setSelectedReport(data.report || data);
       } else {
-        toast.error("Failed to load report");
+        const errorData = await response.json().catch(() => ({ error: "Failed to load report" }));
+        toast.error(errorData.error || "Failed to load report");
       }
     } catch (error) {
       console.error("Failed to load report:", error);

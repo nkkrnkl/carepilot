@@ -1,9 +1,8 @@
 """
 Document Processor for extracting text from various file formats
 
-Handles PDF, text files, images, and other document types for processing before chunking.
-Uses Azure Computer Vision Image Analysis 4.0 READ API for robust text extraction from
-images and PDFs. Falls back to local libraries if Azure Computer Vision is not configured.
+Handles PDF, text files, and other document types for processing before chunking.
+Uses UnstructuredPDFLoader from LangChain for robust PDF processing.
 """
 
 import os
@@ -11,24 +10,14 @@ import tempfile
 from typing import Optional, Dict, Any
 from pathlib import Path
 import base64
-import io
 
-# Azure Computer Vision SDK
-try:
-    from azure.ai.vision.imageanalysis import ImageAnalysisClient
-    from azure.core.credentials import AzureKeyCredential
-    from azure.core.exceptions import AzureError
-    AZURE_VISION_AVAILABLE = True
-except ImportError:
-    AZURE_VISION_AVAILABLE = False
-
-# Fallback libraries (kept as backup)
 try:
     from langchain_community.document_loaders import UnstructuredPDFLoader
     UNSTRUCTURED_AVAILABLE = True
 except ImportError:
     UNSTRUCTURED_AVAILABLE = False
 
+# Fallback libraries (kept as backup)
 try:
     import pdfplumber
     PDFPLUMBER_AVAILABLE = True
@@ -43,53 +32,13 @@ except ImportError:
 
 
 class DocumentProcessor:
-    """
-    Process documents and extract text for vectorization
+    """Process documents and extract text for vectorization"""
     
-    Uses Azure Computer Vision Image Analysis 4.0 READ API as the primary method
-    for extracting text from images and PDFs. Falls back to local libraries if
-    Azure Computer Vision is not configured.
-    """
-    
-    def __init__(
-        self,
-        vision_endpoint: Optional[str] = None,
-        vision_key: Optional[str] = None
-    ):
-        """
-        Initialize document processor
-        
-        Args:
-            vision_endpoint: Azure Computer Vision endpoint URL (defaults to VISION_ENDPOINT env var)
-            vision_key: Azure Computer Vision API key (defaults to VISION_KEY env var)
-        """
-        # Azure Computer Vision configuration
-        self.vision_endpoint = vision_endpoint or os.getenv("VISION_ENDPOINT")
-        self.vision_key = vision_key or os.getenv("VISION_KEY")
-        self.vision_client = None
-        
-        # Initialize Azure Computer Vision client if credentials are available
-        if AZURE_VISION_AVAILABLE and self.vision_endpoint and self.vision_key:
-            try:
-                self.vision_client = ImageAnalysisClient(
-                    endpoint=self.vision_endpoint,
-                    credential=AzureKeyCredential(self.vision_key)
-                )
-            except Exception as e:
-                print(f"Warning: Failed to initialize Azure Computer Vision client: {e}")
-                self.vision_client = None
-        
-        # Supported formats mapping
+    def __init__(self):
+        """Initialize document processor"""
         self.supported_formats = {
             '.pdf': self._extract_pdf_text,
             '.txt': self._extract_text_file,
-            '.jpg': self._extract_image_text,
-            '.jpeg': self._extract_image_text,
-            '.png': self._extract_image_text,
-            '.bmp': self._extract_image_text,
-            '.gif': self._extract_image_text,
-            '.tiff': self._extract_image_text,
-            '.tif': self._extract_image_text,
             '.doc': self._extract_text_file,  # Placeholder - would need python-docx
             '.docx': self._extract_text_file,  # Placeholder - would need python-docx
         }
@@ -136,17 +85,7 @@ class DocumentProcessor:
         
         try:
             text = extract_method(file_content, file_name)
-            # Determine method name based on what was actually used
-            if self.vision_client and (file_ext in ['.pdf', '.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff', '.tif']):
-                method_name = "azure_vision_read"
-            elif file_ext == ".pdf" and UNSTRUCTURED_AVAILABLE:
-                method_name = "unstructured_pdf"
-            elif file_ext == ".pdf" and PDFPLUMBER_AVAILABLE:
-                method_name = "pdfplumber"
-            elif file_ext == ".pdf" and PYPDF2_AVAILABLE:
-                method_name = "pypdf2"
-            else:
-                method_name = file_ext
+            method_name = "unstructured_pdf" if file_ext == ".pdf" and UNSTRUCTURED_AVAILABLE else file_ext
             return {
                 "text": text,
                 "method": method_name,
@@ -162,21 +101,12 @@ class DocumentProcessor:
     
     def _extract_pdf_text(self, file_content: bytes, file_name: str) -> str:
         """
-        Extract text from PDF file using Azure Computer Vision READ API
+        Extract text from PDF file using UnstructuredPDFLoader
         
-        The READ API provides excellent OCR capabilities for PDFs, including
-        scanned documents and complex layouts. Falls back to local libraries
-        if Azure Computer Vision is not available.
+        UnstructuredPDFLoader provides better handling of complex PDF layouts,
+        tables, and various document structures compared to basic PDF libraries.
         """
-        # Try Azure Computer Vision READ API first (preferred method)
-        if self.vision_client:
-            try:
-                return self._extract_text_with_vision(file_content, file_name)
-            except Exception as e:
-                print(f"Azure Computer Vision READ failed, falling back to local extraction: {e}")
-                # Continue to fallback methods below
-        
-        # Fallback to UnstructuredPDFLoader
+        # Try UnstructuredPDFLoader first (preferred method)
         if UNSTRUCTURED_AVAILABLE:
             try:
                 # UnstructuredPDFLoader requires a file path, so we create a temporary file
@@ -257,121 +187,8 @@ class DocumentProcessor:
         
         raise Exception(
             "No PDF extraction library available. "
-            "Configure Azure Computer Vision (VISION_ENDPOINT and VISION_KEY) or "
-            "install unstructured[pdf] (recommended), pdfplumber, or PyPDF2."
+            "Install unstructured[pdf] (recommended), pdfplumber, or PyPDF2."
         )
-    
-    def _extract_image_text(self, file_content: bytes, file_name: str) -> str:
-        """
-        Extract text from image file using Azure Computer Vision READ API
-        
-        The READ API provides excellent OCR capabilities for images, including
-        photos, scanned documents, and screenshots.
-        """
-        # Try Azure Computer Vision READ API first (preferred method)
-        if self.vision_client:
-            try:
-                return self._extract_text_with_vision(file_content, file_name)
-            except Exception as e:
-                raise Exception(f"Azure Computer Vision READ failed: {e}")
-        
-        # If Azure Computer Vision is not available, raise error
-        raise Exception(
-            "Azure Computer Vision is required for image text extraction. "
-            "Please configure VISION_ENDPOINT and VISION_KEY environment variables."
-        )
-    
-    def _extract_text_with_vision(self, file_content: bytes, file_name: str) -> str:
-        """
-        Extract text using Azure Computer Vision READ API
-        
-        This method uses the READ feature from Image Analysis 4.0 API to extract
-        text from images and PDFs. Follows the official Microsoft tutorial:
-        https://learn.microsoft.com/en-us/azure/ai-services/computer-vision/quickstarts-sdk/image-analysis-client-library-40
-        
-        The READ API supports:
-        - Images: JPG, PNG, BMP, GIF, TIFF
-        - PDFs: Multi-page PDF documents
-        - Handwritten text recognition
-        - Printed text recognition
-        - Mixed content (text + images)
-        
-        Args:
-            file_content: File content as bytes
-            file_name: Name of the file (for logging)
-        
-        Returns:
-            Extracted text as a string
-        """
-        if not self.vision_client:
-            raise Exception("Azure Computer Vision client not initialized")
-        
-        try:
-            # Import VisualFeatures enum from models (correct import path)
-            from azure.ai.vision.imageanalysis.models import VisualFeatures
-            
-            # Use the READ feature to extract text
-            # The READ API automatically detects text in images and PDFs
-            # Based on Microsoft tutorial: https://learn.microsoft.com/en-us/azure/ai-services/computer-vision/quickstarts-sdk/image-analysis-client-library-40
-            result = self.vision_client.analyze(
-                image_data=file_content,
-                visual_features=[VisualFeatures.READ]
-            )
-            
-            # Extract text from the result following the SDK structure
-            # Structure: result.read -> blocks -> lines -> text
-            # Based on models: ReadResult, DetectedTextBlock, DetectedTextLine
-            text_lines = []
-            
-            # Access the read property from the result (lowercase in Python SDK)
-            if hasattr(result, 'read') and result.read:
-                read_result = result.read
-                
-                # Iterate through blocks (text regions)
-                if hasattr(read_result, 'blocks') and read_result.blocks:
-                    for block in read_result.blocks:
-                        # Each block contains lines
-                        if hasattr(block, 'lines') and block.lines:
-                            for line in block.lines:
-                                # Each line has a text property
-                                if hasattr(line, 'text') and line.text:
-                                    text_lines.append(line.text)
-                                # Fallback: reconstruct from words if text not available
-                                elif hasattr(line, 'words') and line.words:
-                                    words = []
-                                    for word in line.words:
-                                        if hasattr(word, 'text') and word.text:
-                                            words.append(word.text)
-                                    if words:
-                                        text_lines.append(' '.join(words))
-            
-            # Alternative: try uppercase attributes (for compatibility)
-            if not text_lines:
-                if hasattr(result, 'Read') and result.Read:
-                    read_result = result.Read
-                    if hasattr(read_result, 'Blocks') and read_result.Blocks:
-                        for block in read_result.Blocks:
-                            if hasattr(block, 'Lines') and block.Lines:
-                                for line in block.Lines:
-                                    if hasattr(line, 'Text') and line.Text:
-                                        text_lines.append(line.Text)
-                                    elif hasattr(line, 'text') and line.text:
-                                        text_lines.append(line.text)
-            
-            # Join all text lines with newlines to preserve structure
-            extracted_text = "\n".join(text_lines) if text_lines else ""
-            
-            if not extracted_text:
-                raise Exception("No text extracted from document. The document may not contain readable text.")
-            
-            return extracted_text
-            
-        except AzureError as e:
-            raise Exception(f"Azure Computer Vision API error: {str(e)}")
-        except ImportError as e:
-            raise Exception(f"Azure Computer Vision SDK import error: {str(e)}")
-        except Exception as e:
-            raise Exception(f"Failed to extract text with Azure Computer Vision: {str(e)}")
     
     def _extract_text_file(self, file_content: bytes, file_name: str) -> str:
         """Extract text from plain text file"""
