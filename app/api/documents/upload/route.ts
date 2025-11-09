@@ -136,7 +136,235 @@ export async function POST(request: NextRequest) {
       ...result.data,
     };
 
-    // Step 3: If document type is EOB, automatically extract EOB information
+    // Step 3: If document type is plan_document, automatically extract benefits information
+    if (docType === "plan_document") {
+      try {
+        console.log("Starting benefits extraction for plan document...");
+        const benefitsExtractScriptPath = join(process.cwd(), "backend", "scripts", "extract_benefits.py");
+        const benefitsResult = await executePython(benefitsExtractScriptPath, {
+          userId,
+          documentId: docId,
+          docType: "plan_document",
+          method: "cot",
+        });
+
+        if (benefitsResult.success && benefitsResult.data?.benefits) {
+          console.log("Benefits extracted successfully, storing in SQL database...");
+          
+          try {
+            // Import SQL storage function
+            const { upsertInsuranceBenefits } = await import("@/lib/azure/sql-storage");
+            
+            // Transform benefits data to match SQL schema
+            const benefitsData = benefitsResult.data.benefits;
+            
+            // Prepare benefits entity for SQL storage
+            // Helper function to convert null to undefined for optional fields
+            const valueOrUndefined = <T>(value: T | null | undefined): T | undefined => {
+              return value === null ? undefined : value;
+            };
+
+            const benefitsEntity = {
+              user_id: userId,
+              plan_name: benefitsData.plan_name || "Unknown Plan",
+              plan_type: valueOrUndefined(benefitsData.plan_type),
+              insurance_provider: valueOrUndefined(benefitsData.insurance_provider),
+              policy_number: valueOrUndefined(benefitsData.policy_number),
+              group_number: valueOrUndefined(benefitsData.group_number),
+              effective_date: valueOrUndefined(benefitsData.effective_date),
+              expiration_date: valueOrUndefined(benefitsData.expiration_date),
+              deductibles: benefitsData.deductibles ? JSON.stringify(benefitsData.deductibles) : undefined,
+              copays: benefitsData.copays ? JSON.stringify(benefitsData.copays) : undefined,
+              coinsurance: benefitsData.coinsurance ? JSON.stringify(benefitsData.coinsurance) : undefined,
+              coverage_limits: benefitsData.coverage_limits ? JSON.stringify(benefitsData.coverage_limits) : undefined,
+              services: benefitsData.services ? JSON.stringify(benefitsData.services) : undefined,
+              out_of_pocket_max_individual: valueOrUndefined(benefitsData.out_of_pocket_max_individual),
+              out_of_pocket_max_family: valueOrUndefined(benefitsData.out_of_pocket_max_family),
+              in_network_providers: valueOrUndefined(benefitsData.in_network_providers),
+              out_of_network_coverage: benefitsData.out_of_network_coverage || false,
+              network_notes: valueOrUndefined(benefitsData.network_notes),
+              preauth_required_services: benefitsData.preauth_required_services ? JSON.stringify(benefitsData.preauth_required_services) : undefined,
+              preauth_notes: valueOrUndefined(benefitsData.preauth_notes),
+              exclusions: benefitsData.exclusions ? JSON.stringify(benefitsData.exclusions) : undefined,
+              exclusion_notes: valueOrUndefined(benefitsData.exclusion_notes),
+              special_programs: benefitsData.special_programs ? JSON.stringify(benefitsData.special_programs) : undefined,
+              additional_benefits: valueOrUndefined(benefitsData.additional_benefits),
+              notes: valueOrUndefined(benefitsData.notes),
+              source_document_id: docId,
+            };
+
+            // Store in SQL database
+            await upsertInsuranceBenefits(benefitsEntity);
+            console.log("Benefits stored successfully in SQL database");
+
+            // Add benefits extraction results to the response
+            return NextResponse.json({
+              ...uploadResponse,
+              benefitsExtraction: {
+                success: true,
+                benefitsData: benefitsData,
+                sqlStored: true,
+              },
+            });
+          } catch (sqlError) {
+            console.error("Error storing benefits in SQL database:", sqlError);
+            // Still return success with benefits data, but note SQL storage failed
+            return NextResponse.json({
+              ...uploadResponse,
+              benefitsExtraction: {
+                success: true,
+                benefitsData: benefitsResult.data.benefits,
+                sqlStored: false,
+                sqlError: sqlError instanceof Error ? sqlError.message : "Unknown error",
+              },
+              warning: "Benefits extracted successfully, but failed to store in SQL database. Data is available in Pinecone.",
+            });
+          }
+        } else {
+          // Upload succeeded but benefits extraction failed - still return success with warning
+          console.warn("Benefits extraction failed:", benefitsResult.error);
+          return NextResponse.json({
+            ...uploadResponse,
+            benefitsExtraction: {
+              success: false,
+              error: benefitsResult.error || "Benefits extraction failed",
+            },
+            warning: "Document uploaded successfully, but benefits extraction failed. You can extract benefits information later.",
+          });
+        }
+      } catch (benefitsError) {
+        // Upload succeeded but benefits extraction threw an error - still return success with warning
+        console.error("Benefits extraction error:", benefitsError);
+        return NextResponse.json({
+          ...uploadResponse,
+          benefitsExtraction: {
+            success: false,
+            error: benefitsError instanceof Error ? benefitsError.message : "Unknown error during benefits extraction",
+          },
+          warning: "Document uploaded successfully, but benefits extraction encountered an error. You can extract benefits information later.",
+        });
+      }
+    }
+
+    // Step 4: If document type is lab_report, automatically extract lab data using lab agent
+    if (docType === "lab_report") {
+      try {
+        console.log("Starting lab report extraction using lab agent...");
+        const labExtractScriptPath = join(process.cwd(), "backend", "scripts", "extract_lab_agent.py");
+        
+        // Get file content as base64 for the lab agent
+        const fileContentBase64 = buffer.toString("base64");
+        
+        const labResult = await executePython(labExtractScriptPath, {
+          userId,
+          documentId: docId,
+          fileContent: fileContentBase64,
+          fileName: file.name,
+          fileType: file.type || "application/pdf",
+        });
+        
+        console.log("Lab extraction result:", {
+          success: labResult.success,
+          error: labResult.error,
+          hasData: !!labResult.data,
+          dataKeys: labResult.data ? Object.keys(labResult.data) : [],
+        });
+
+        if (labResult.success && labResult.data?.labData) {
+          console.log("Lab report extracted successfully, storing in SQL database...");
+          
+          try {
+            // Import SQL storage function
+            const { upsertLabReport } = await import("@/lib/azure/sql-storage");
+            
+            // Transform lab data to match SQL schema
+            const labData = labResult.data.labData;
+            
+            // Helper function to convert string to title case
+            const toTitleCase = (str: string): string => {
+              return str.replace(/\w\S*/g, (txt) => {
+                return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+              });
+            };
+
+            // Prepare lab report entity for SQL storage
+            const defaultTitle = file.name
+              .replace(".pdf", "")
+              .replace(/_/g, " ")
+              .split(" ")
+              .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+              .join(" ");
+
+            const labReportEntity = {
+              id: docId,
+              userId: userId,
+              title: labData.title || defaultTitle,
+              date: labData.date ? new Date(labData.date).toISOString().split('T')[0] : undefined,
+              hospital: labData.hospital || undefined,
+              doctor: labData.doctor || undefined,
+              fileUrl: undefined, // File is stored in Pinecone, not as a URL
+              rawExtract: labData.rawExtract || undefined,
+              parameters: labData.parameters || undefined,
+            };
+
+            // Store in SQL database
+            await upsertLabReport(labReportEntity);
+            console.log("Lab report stored successfully in SQL database");
+
+            // Add lab extraction results to the response
+            return NextResponse.json({
+              ...uploadResponse,
+              labExtraction: {
+                success: true,
+                labData: labData,
+                dashboard: labResult.data.dashboard,
+                workflowCompleted: labResult.data.workflowCompleted,
+                sqlStored: true,
+              },
+            });
+          } catch (sqlError) {
+            console.error("Error storing lab report in SQL database:", sqlError);
+            // Still return success with lab data, but note SQL storage failed
+            return NextResponse.json({
+              ...uploadResponse,
+              labExtraction: {
+                success: true,
+                labData: labResult.data.labData,
+                dashboard: labResult.data.dashboard,
+                workflowCompleted: labResult.data.workflowCompleted,
+                sqlStored: false,
+                sqlError: sqlError instanceof Error ? sqlError.message : "Unknown error",
+              },
+              warning: "Lab report extracted successfully, but failed to store in SQL database. Data is available in Pinecone.",
+            });
+          }
+        } else {
+          // Upload succeeded but lab extraction failed - still return success with warning
+          console.warn("Lab extraction failed:", labResult.error);
+          return NextResponse.json({
+            ...uploadResponse,
+            labExtraction: {
+              success: false,
+              error: labResult.error || "Lab extraction failed",
+            },
+            warning: "Document uploaded successfully, but lab extraction failed. You can extract lab information later.",
+          });
+        }
+      } catch (labError) {
+        // Upload succeeded but lab extraction threw an error - still return success with warning
+        console.error("Lab extraction error:", labError);
+        return NextResponse.json({
+          ...uploadResponse,
+          labExtraction: {
+            success: false,
+            error: labError instanceof Error ? labError.message : "Unknown error during lab extraction",
+          },
+          warning: "Document uploaded successfully, but lab extraction encountered an error. You can extract lab information later.",
+        });
+      }
+    }
+
+    // Step 5: If document type is EOB, automatically extract EOB information
     if (docType === "eob") {
       try {
         const eobExtractScriptPath = join(process.cwd(), "backend", "scripts", "extract_eob.py");

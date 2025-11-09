@@ -1,29 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getLabReportsByUserId } from "@/lib/azure/sql-storage";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic'; // Ensure this route is dynamic
 
-/**
- * @deprecated This route is deprecated. Lab reports are now managed through
- * the document upload system (/api/documents/upload) which stores data in
- * SQL Server and Pinecone. Please update your code to use the new system.
- */
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const userId = searchParams.get("userId") || "demo-user";
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get("userId");
 
-    // Return empty array - lab reports are now managed through SQL Server
-    // TODO: Query from SQL Server LabReport table if needed
-    console.warn(
-      "⚠️  /api/labs/list is deprecated. Lab reports are now stored in SQL Server via /api/documents/upload"
-    );
+    if (!userId) {
+      return NextResponse.json(
+        { success: false, error: "userId is required" },
+        { status: 400 }
+      );
+    }
 
-    return NextResponse.json([]);
+    const labReports = await getLabReportsByUserId(userId);
+
+    // Parse JSON strings back to objects for easier consumption
+    const parsedReports = labReports.map((report) => ({
+      ...report,
+      rawExtract: report.rawExtract ? JSON.parse(report.rawExtract) : null,
+      parameters: report.parameters ? JSON.parse(report.parameters) : null,
+    }));
+
+    return NextResponse.json({
+      success: true,
+      reports: parsedReports,
+      count: parsedReports.length,
+    });
   } catch (error) {
-    console.error("List error:", error);
+    console.error("Error fetching lab reports:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to list reports" },
+      { success: false, error: error instanceof Error ? error.message : "Failed to fetch lab reports" },
       { status: 500 }
     );
   }

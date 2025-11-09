@@ -47,12 +47,6 @@ export function Navbar({ showAuth = true, variant = "default", navLinks }: Navba
                   {!isLoading && (
                     user ? (
                       <>
-                        <Button asChild variant="outline">
-                          <Link href="/profile" className="flex items-center gap-2">
-                            <User className="h-4 w-4" />
-                            {user.name || user.email}
-                          </Link>
-                        </Button>
                         <Button asChild variant="ghost">
                           <a href="/auth/logout" className="flex items-center gap-2">
                             <LogOut className="h-4 w-4" />

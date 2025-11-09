@@ -14,6 +14,10 @@ interface UploadedFile {
   chunkCount?: number;
   eobExtracted?: boolean;
   eobError?: string;
+  benefitsExtracted?: boolean;
+  benefitsError?: string;
+  labExtracted?: boolean;
+  labError?: string;
 }
 
 interface DocumentUploadSimpleProps {
@@ -142,6 +146,14 @@ export function DocumentUploadSimple({
         eobExtracted: fileData.type === "eob" && result.eobExtraction ? result.eobExtraction.success : undefined,
         eobError: fileData.type === "eob" && result.eobExtraction && !result.eobExtraction.success 
           ? result.eobExtraction.error || "EOB extraction failed" 
+          : undefined,
+        benefitsExtracted: fileData.type === "plan_document" && result.benefitsExtraction ? result.benefitsExtraction.success : undefined,
+        benefitsError: fileData.type === "plan_document" && result.benefitsExtraction && !result.benefitsExtraction.success 
+          ? result.benefitsExtraction.error || "Benefits extraction failed" 
+          : undefined,
+        labExtracted: fileData.type === "lab_report" && result.labExtraction ? result.labExtraction.success : undefined,
+        labError: fileData.type === "lab_report" && result.labExtraction && !result.labExtraction.success 
+          ? result.labExtraction.error || "Lab extraction failed" 
           : undefined,
       };
 
@@ -303,7 +315,9 @@ export function DocumentUploadSimple({
                 {fileData.status === "extracting" && (
                   <div className="flex items-center gap-2 text-purple-600">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-xs">Extracting EOB...</span>
+                    <span className="text-xs">
+                      {fileData.type === "eob" ? "Extracting EOB..." : fileData.type === "plan_document" ? "Extracting benefits..." : "Extracting..."}
+                    </span>
                   </div>
                 )}
                 {fileData.status === "success" && (
@@ -318,6 +332,22 @@ export function DocumentUploadSimple({
                     {fileData.type === "eob" && fileData.eobExtracted === false && fileData.eobError && (
                       <span className="text-xs text-yellow-600" title={fileData.eobError}>
                         ⚠ EOB extraction failed
+                      </span>
+                    )}
+                    {fileData.type === "plan_document" && fileData.benefitsExtracted === true && (
+                      <span className="text-xs text-green-600">✓ Benefits extracted</span>
+                    )}
+                    {fileData.type === "plan_document" && fileData.benefitsExtracted === false && fileData.benefitsError && (
+                      <span className="text-xs text-yellow-600" title={fileData.benefitsError}>
+                        ⚠ Benefits extraction failed
+                      </span>
+                    )}
+                    {fileData.type === "lab_report" && fileData.labExtracted === true && (
+                      <span className="text-xs text-green-600">✓ Lab extracted</span>
+                    )}
+                    {fileData.type === "lab_report" && fileData.labExtracted === false && fileData.labError && (
+                      <span className="text-xs text-yellow-600" title={fileData.labError}>
+                        ⚠ Lab extraction failed
                       </span>
                     )}
                   </div>

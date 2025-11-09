@@ -16,7 +16,7 @@ export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, role } = await request.json();
+    const { email, role, oauthProvider, oauthProviderId, oauthEmail, firstName, lastName } = await request.json();
     
     if (!email) {
       return NextResponse.json(
@@ -35,27 +35,36 @@ export async function POST(request: NextRequest) {
     // Check if user exists in database
     let user = await getUserByEmail(email);
 
+    // Extract name from firstName/lastName or email
+    const nameParts = email.split('@');
+    const userFirstName = firstName || nameParts[0] || "User";
+    const userLastName = lastName || "";
+
     if (user) {
-      // Update existing user with role
-      await updateUser(email, { userRole: role });
+      // Update existing user with role and OAuth info (if provided and not already set)
+      const updates: any = { userRole: role };
+      if (oauthProviderId && !user.oauth_provider_id) {
+        updates.oauth_provider = oauthProvider || "auth0";
+        updates.oauth_provider_id = oauthProviderId;
+        updates.oauth_email = oauthEmail || email;
+      }
+      await updateUser(email, updates);
     } else {
-      // User doesn't exist yet, create a minimal user record with role
-      // This allows users to set their role before filling out their full profile
-      const nameParts = email.split('@');
-      const firstName = nameParts[0] || "User";
-      const lastName = "";
-      
-      // Create minimal user record with role
+      // User doesn't exist yet, create a minimal user record with role and OAuth info
       await createUser({
         emailAddress: email,
-        FirstName: firstName,
-        LastName: lastName,
+        FirstName: userFirstName,
+        LastName: userLastName,
         DateOfBirth: "1900-01-01", // Placeholder, user should update this in profile
         StreetAddress: "", // Placeholder
         PatientCity: "", // Placeholder
         PatientState: "", // Placeholder
         InsurancePlanType: "Other", // Placeholder
         userRole: role,
+        // OAuth fields (if provided)
+        oauth_provider: oauthProvider || undefined,
+        oauth_provider_id: oauthProviderId || undefined,
+        oauth_email: oauthEmail || email,
       });
     }
 

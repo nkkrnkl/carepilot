@@ -22,7 +22,10 @@
     "migrate-user-table": "tsx scripts/migrate-user-table.ts",
     "migrate-doctors-to-sql": "tsx scripts/migrate-doctors-to-sql.ts",
     "add-user-role-column": "tsx scripts/add-user-role-column.ts",
-    "clear:labs": "node scripts/clear-labs.js"
+    "clear:labs": "node scripts/clear-labs.js",
+    "execute-schema": "tsx scripts/execute-schema.sql.ts",
+    "drop-all-tables": "tsx scripts/drop-all-tables.ts",
+    "check-lab-reports": "tsx scripts/check-lab-reports.ts"
   },
   "dependencies": {
     "@auth0/nextjs-auth0": "^4.12.0",

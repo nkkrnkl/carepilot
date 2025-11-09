@@ -170,6 +170,10 @@ export interface UserEntity {
   InsuranceCompanyPhoneNumber?: string;
   documents?: string; // JSON string
   userRole?: string; // 'patient' | 'doctor'
+  password_hash?: string; // Hashed password (bcrypt) - Optional, for non-OAuth users
+  oauth_provider?: string; // OAuth provider: 'google', 'facebook', 'auth0', 'microsoft', etc.
+  oauth_provider_id?: string; // User ID from OAuth provider
+  oauth_email?: string; // Email from OAuth provider (may differ from emailAddress)
   created_at?: Date;
   updated_at?: Date;
 }
@@ -299,6 +303,7 @@ export async function createUser(user: Omit<UserEntity, "created_at" | "updated_
   const pool = await getConnectionPool();
   const request = pool.request();
   
+  // Basic required fields
   request.input("emailAddress", sql.NVarChar, user.emailAddress);
   request.input("FirstName", sql.NVarChar, user.FirstName);
   request.input("LastName", sql.NVarChar, user.LastName);
@@ -316,20 +321,56 @@ export async function createUser(user: Omit<UserEntity, "created_at" | "updated_
   request.input("InsuranceCompanyPhoneNumber", sql.NVarChar, user.InsuranceCompanyPhoneNumber || null);
   request.input("documents", sql.NVarChar(sql.MAX), user.documents || null);
   request.input("userRole", sql.NVarChar, user.userRole || null);
+  request.input("password_hash", sql.NVarChar, user.password_hash || null);
+  
+  // Check if OAuth columns exist before trying to insert
+  const checkOAuthColumns = await request.query(`
+    SELECT COLUMN_NAME 
+    FROM INFORMATION_SCHEMA.COLUMNS 
+    WHERE TABLE_NAME = 'user_table' 
+    AND COLUMN_NAME IN ('oauth_provider', 'oauth_provider_id', 'oauth_email')
+  `);
+  
+  const hasOAuthColumns = checkOAuthColumns.recordset.length > 0;
+  const oauthColumns = checkOAuthColumns.recordset.map((r: any) => r.COLUMN_NAME);
+  
+  // Build dynamic INSERT statement based on which columns exist
+  const baseColumns = [
+    'emailAddress', 'FirstName', 'LastName', 'DateOfBirth', 'StreetAddress', 'PatientCity', 'PatientState',
+    'providerId', 'insurerId', 'InsuranceGroupNumber', 'InsurancePlanType',
+    'InsuranceCompanyStreetAddress', 'InsuranceCompanyCity', 'InsuranceCompanyState', 'InsuranceCompanyPhoneNumber',
+    'documents', 'userRole', 'password_hash'
+  ];
+  
+  const baseValues = [
+    '@emailAddress', '@FirstName', '@LastName', '@DateOfBirth', '@StreetAddress', '@PatientCity', '@PatientState',
+    '@providerId', '@insurerId', '@InsuranceGroupNumber', '@InsurancePlanType',
+    '@InsuranceCompanyStreetAddress', '@InsuranceCompanyCity', '@InsuranceCompanyState', '@InsuranceCompanyPhoneNumber',
+    '@documents', '@userRole', '@password_hash'
+  ];
+  
+  if (hasOAuthColumns) {
+    request.input("oauth_provider", sql.NVarChar, user.oauth_provider || null);
+    request.input("oauth_provider_id", sql.NVarChar, user.oauth_provider_id || null);
+    request.input("oauth_email", sql.NVarChar, user.oauth_email || null);
+    
+    if (oauthColumns.includes('oauth_provider')) {
+      baseColumns.push('oauth_provider');
+      baseValues.push('@oauth_provider');
+    }
+    if (oauthColumns.includes('oauth_provider_id')) {
+      baseColumns.push('oauth_provider_id');
+      baseValues.push('@oauth_provider_id');
+    }
+    if (oauthColumns.includes('oauth_email')) {
+      baseColumns.push('oauth_email');
+      baseValues.push('@oauth_email');
+    }
+  }
   
   await request.query(`
-    INSERT INTO user_table (
-      emailAddress, FirstName, LastName, DateOfBirth, StreetAddress, PatientCity, PatientState,
-      providerId, insurerId, InsuranceGroupNumber, InsurancePlanType,
-      InsuranceCompanyStreetAddress, InsuranceCompanyCity, InsuranceCompanyState, InsuranceCompanyPhoneNumber,
-      documents, userRole
-    )
-    VALUES (
-      @emailAddress, @FirstName, @LastName, @DateOfBirth, @StreetAddress, @PatientCity, @PatientState,
-      @providerId, @insurerId, @InsuranceGroupNumber, @InsurancePlanType,
-      @InsuranceCompanyStreetAddress, @InsuranceCompanyCity, @InsuranceCompanyState, @InsuranceCompanyPhoneNumber,
-      @documents, @userRole
-    )
+    INSERT INTO user_table (${baseColumns.join(', ')})
+    VALUES (${baseValues.join(', ')})
   `);
 }
 
@@ -337,17 +378,70 @@ export async function getUserByEmail(emailAddress: string): Promise<UserEntity |
   const pool = await getConnectionPool();
   const request = pool.request();
   
-  request.input("emailAddress", sql.NVarChar, emailAddress);
+  // Normalize email address (trim for consistency, but preserve case for exact match)
+  const normalizedEmail = emailAddress.trim();
   
-  const result = await request.query(`
-    SELECT * FROM user_table WHERE emailAddress = @emailAddress
+  console.log("getUserByEmail - Searching for email:", normalizedEmail);
+  console.log("getUserByEmail - Email length:", normalizedEmail.length);
+  console.log("getUserByEmail - Email bytes:", Buffer.from(normalizedEmail).toString('hex'));
+  
+  request.input("emailAddress", sql.NVarChar, normalizedEmail);
+  
+  // Use case-insensitive comparison with LOWER and trim to handle any whitespace issues
+  // Also try exact match first, then fall back to case-insensitive
+  let result = await request.query(`
+    SELECT * FROM user_table 
+    WHERE emailAddress = @emailAddress
   `);
   
+  // If no exact match, try case-insensitive
   if (result.recordset.length === 0) {
+    console.log("Exact match not found, trying case-insensitive match");
+    result = await request.query(`
+      SELECT * FROM user_table 
+      WHERE LOWER(LTRIM(RTRIM(emailAddress))) = LOWER(LTRIM(RTRIM(@emailAddress)))
+    `);
+  }
+  
+  console.log("Database query returned", result.recordset.length, "row(s)");
+  
+  if (result.recordset.length === 0) {
+    console.log("No user found with email:", normalizedEmail);
+    
+    // Debug: Let's see what emails exist in the database
+    const allUsers = await request.query(`
+      SELECT TOP 5 emailAddress, FirstName, LastName FROM user_table
+    `);
+    console.log("Sample users in database:", allUsers.recordset.map((u: any) => ({
+      email: u.emailAddress,
+      firstName: u.FirstName,
+      lastName: u.LastName
+    })));
+    
     return null;
   }
   
-  return result.recordset[0] as UserEntity;
+  const user = result.recordset[0] as any;
+  
+  console.log("Found user in database:", {
+    email: user.emailAddress,
+    firstName: user.FirstName,
+    lastName: user.LastName,
+    hasDateOfBirth: !!user.DateOfBirth,
+    emailMatches: user.emailAddress === normalizedEmail,
+    emailLowercaseMatches: user.emailAddress.toLowerCase() === normalizedEmail.toLowerCase()
+  });
+  
+  // Convert DateOfBirth from Date object to string if needed
+  // SQL Server DATE columns are returned as Date objects by mssql library
+  if (user.DateOfBirth instanceof Date) {
+    user.DateOfBirth = user.DateOfBirth.toISOString().split('T')[0]; // YYYY-MM-DD format
+  } else if (user.DateOfBirth && typeof user.DateOfBirth === 'string') {
+    // If it's already a string, ensure it's in YYYY-MM-DD format
+    user.DateOfBirth = user.DateOfBirth.split('T')[0];
+  }
+  
+  return user as UserEntity;
 }
 
 export async function updateUser(
@@ -359,13 +453,33 @@ export async function updateUser(
   
   request.input("emailAddress", sql.NVarChar, emailAddress);
   
-  const updateFields: string[] = [];
-  const updateValues: { [key: string]: any } = {};
+  // Check which columns exist in the table
+  const checkColumns = await request.query(`
+    SELECT COLUMN_NAME 
+    FROM INFORMATION_SCHEMA.COLUMNS 
+    WHERE TABLE_NAME = 'user_table'
+  `);
   
+  const existingColumns = checkColumns.recordset.map((r: any) => r.COLUMN_NAME);
+  
+  const updateFields: string[] = [];
+  
+  // Handle each field based on its type
   Object.entries(updates).forEach(([key, value]) => {
-    if (value !== undefined) {
-      updateFields.push(`${key} = @${key}`);
-      request.input(key, sql.NVarChar(sql.MAX), value);
+    if (value !== undefined && existingColumns.includes(key)) {
+      // Map JavaScript field names to SQL column names (they're the same in our case)
+      const sqlColumnName = key;
+      
+      updateFields.push(`${sqlColumnName} = @${key}`);
+      
+      // Use appropriate SQL type based on field
+      if (key === "DateOfBirth") {
+        request.input(key, sql.Date, value);
+      } else if (key === "documents") {
+        request.input(key, sql.NVarChar(sql.MAX), value);
+      } else {
+        request.input(key, sql.NVarChar, value);
+      }
     }
   });
   
@@ -679,5 +793,278 @@ export async function deleteAppointment(appointmentId: string): Promise<void> {
   await request.query(`
     DELETE FROM userAppointmentScheduled_table WHERE appointment_id = @appointment_id
   `);
+}
+
+// ============================================================================
+// INSURANCE BENEFITS OPERATIONS
+// ============================================================================
+
+export interface InsuranceBenefitsEntity {
+  id?: number;
+  precheckcover_id?: string;
+  user_id: string;
+  plan_name: string;
+  plan_type?: string;
+  insurance_provider?: string;
+  policy_number?: string;
+  group_number?: string;
+  effective_date?: string;
+  expiration_date?: string;
+  deductibles?: string; // JSON string
+  copays?: string; // JSON string
+  coinsurance?: string; // JSON string
+  coverage_limits?: string; // JSON string
+  services?: string; // JSON string
+  out_of_pocket_max_individual?: number;
+  out_of_pocket_max_family?: number;
+  in_network_providers?: string;
+  out_of_network_coverage?: boolean;
+  network_notes?: string;
+  preauth_required_services?: string; // JSON string
+  preauth_notes?: string;
+  exclusions?: string; // JSON string
+  exclusion_notes?: string;
+  special_programs?: string; // JSON string
+  additional_benefits?: string;
+  notes?: string;
+  extracted_date?: Date;
+  source_document_id?: string;
+  created_at?: Date;
+  updated_at?: Date;
+}
+
+export async function upsertInsuranceBenefits(
+  benefits: InsuranceBenefitsEntity
+): Promise<void> {
+  const pool = await getConnectionPool();
+  const request = pool.request();
+
+  // Generate precheckcover_id if not provided
+  const precheckcover_id = benefits.precheckcover_id || `benefits-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+  // Prepare inputs
+  request.input("precheckcover_id", sql.NVarChar, precheckcover_id);
+  request.input("user_id", sql.NVarChar, benefits.user_id);
+  request.input("plan_name", sql.NVarChar, benefits.plan_name);
+  request.input("plan_type", sql.NVarChar, benefits.plan_type || null);
+  request.input("insurance_provider", sql.NVarChar, benefits.insurance_provider || null);
+  request.input("policy_number", sql.NVarChar, benefits.policy_number || null);
+  request.input("group_number", sql.NVarChar, benefits.group_number || null);
+  request.input("effective_date", sql.Date, benefits.effective_date ? new Date(benefits.effective_date) : null);
+  request.input("expiration_date", sql.Date, benefits.expiration_date ? new Date(benefits.expiration_date) : null);
+  request.input("deductibles", sql.NVarChar(sql.MAX), benefits.deductibles || null);
+  request.input("copays", sql.NVarChar(sql.MAX), benefits.copays || null);
+  request.input("coinsurance", sql.NVarChar(sql.MAX), benefits.coinsurance || null);
+  request.input("coverage_limits", sql.NVarChar(sql.MAX), benefits.coverage_limits || null);
+  request.input("services", sql.NVarChar(sql.MAX), benefits.services || null);
+  request.input("out_of_pocket_max_individual", sql.Decimal(10, 2), benefits.out_of_pocket_max_individual || null);
+  request.input("out_of_pocket_max_family", sql.Decimal(10, 2), benefits.out_of_pocket_max_family || null);
+  request.input("in_network_providers", sql.NVarChar(sql.MAX), benefits.in_network_providers || null);
+  request.input("out_of_network_coverage", sql.Bit, benefits.out_of_network_coverage ? 1 : 0);
+  request.input("network_notes", sql.NVarChar(sql.MAX), benefits.network_notes || null);
+  request.input("preauth_required_services", sql.NVarChar(sql.MAX), benefits.preauth_required_services || null);
+  request.input("preauth_notes", sql.NVarChar(sql.MAX), benefits.preauth_notes || null);
+  request.input("exclusions", sql.NVarChar(sql.MAX), benefits.exclusions || null);
+  request.input("exclusion_notes", sql.NVarChar(sql.MAX), benefits.exclusion_notes || null);
+  request.input("special_programs", sql.NVarChar(sql.MAX), benefits.special_programs || null);
+  request.input("additional_benefits", sql.NVarChar(sql.MAX), benefits.additional_benefits || null);
+  request.input("notes", sql.NVarChar(sql.MAX), benefits.notes || null);
+  request.input("source_document_id", sql.NVarChar, benefits.source_document_id || null);
+
+  // Use MERGE (UPSERT) to handle unique constraint
+  // Note: Unique constraint is on (plan_name, policy_number, user_id)
+  // Handle NULL policy_number correctly in the ON clause
+  await request.query(`
+    MERGE [dbo].[insurance_benefits] AS target
+    USING (SELECT 
+      @precheckcover_id AS precheckcover_id,
+      @user_id AS user_id,
+      @plan_name AS plan_name,
+      @policy_number AS policy_number
+    ) AS source
+    ON target.[plan_name] = source.[plan_name] 
+      AND target.[user_id] = source.[user_id]
+      AND (target.[policy_number] = source.[policy_number] OR (target.[policy_number] IS NULL AND source.[policy_number] IS NULL))
+    WHEN MATCHED THEN
+      UPDATE SET
+        [precheckcover_id] = @precheckcover_id,
+        [plan_type] = @plan_type,
+        [insurance_provider] = @insurance_provider,
+        [policy_number] = @policy_number,
+        [group_number] = @group_number,
+        [effective_date] = @effective_date,
+        [expiration_date] = @expiration_date,
+        [deductibles] = @deductibles,
+        [copays] = @copays,
+        [coinsurance] = @coinsurance,
+        [coverage_limits] = @coverage_limits,
+        [services] = @services,
+        [out_of_pocket_max_individual] = @out_of_pocket_max_individual,
+        [out_of_pocket_max_family] = @out_of_pocket_max_family,
+        [in_network_providers] = @in_network_providers,
+        [out_of_network_coverage] = @out_of_network_coverage,
+        [network_notes] = @network_notes,
+        [preauth_required_services] = @preauth_required_services,
+        [preauth_notes] = @preauth_notes,
+        [exclusions] = @exclusions,
+        [exclusion_notes] = @exclusion_notes,
+        [special_programs] = @special_programs,
+        [additional_benefits] = @additional_benefits,
+        [notes] = @notes,
+        [source_document_id] = @source_document_id,
+        [updated_at] = GETUTCDATE()
+    WHEN NOT MATCHED THEN
+      INSERT (
+        [precheckcover_id], [user_id], [plan_name], [plan_type], [insurance_provider],
+        [policy_number], [group_number], [effective_date], [expiration_date],
+        [deductibles], [copays], [coinsurance], [coverage_limits], [services],
+        [out_of_pocket_max_individual], [out_of_pocket_max_family],
+        [in_network_providers], [out_of_network_coverage], [network_notes],
+        [preauth_required_services], [preauth_notes],
+        [exclusions], [exclusion_notes],
+        [special_programs], [additional_benefits], [notes],
+        [source_document_id]
+      )
+      VALUES (
+        @precheckcover_id, @user_id, @plan_name, @plan_type, @insurance_provider,
+        @policy_number, @group_number, @effective_date, @expiration_date,
+        @deductibles, @copays, @coinsurance, @coverage_limits, @services,
+        @out_of_pocket_max_individual, @out_of_pocket_max_family,
+        @in_network_providers, @out_of_network_coverage, @network_notes,
+        @preauth_required_services, @preauth_notes,
+        @exclusions, @exclusion_notes,
+        @special_programs, @additional_benefits, @notes,
+        @source_document_id
+      );
+  `);
+}
+
+export async function getInsuranceBenefitsByUserId(userId: string): Promise<InsuranceBenefitsEntity[]> {
+  const pool = await getConnectionPool();
+  const request = pool.request();
+  
+  request.input("user_id", sql.NVarChar, userId);
+  
+  const result = await request.query(`
+    SELECT * FROM insurance_benefits 
+    WHERE user_id = @user_id
+    ORDER BY extracted_date DESC
+  `);
+  
+  return result.recordset as InsuranceBenefitsEntity[];
+}
+
+export async function getInsuranceBenefitsById(id: number): Promise<InsuranceBenefitsEntity | null> {
+  const pool = await getConnectionPool();
+  const request = pool.request();
+  
+  request.input("id", sql.Int, id);
+  
+  const result = await request.query(`
+    SELECT * FROM insurance_benefits WHERE id = @id
+  `);
+  
+  if (result.recordset.length === 0) {
+    return null;
+  }
+  
+  return result.recordset[0] as InsuranceBenefitsEntity;
+}
+
+// ============================================================================
+// LAB REPORT OPERATIONS
+// ============================================================================
+
+export interface LabReportEntity {
+  id: string;
+  userId: string;
+  title?: string;
+  date?: string;
+  hospital?: string;
+  doctor?: string;
+  fileUrl?: string;
+  rawExtract?: string; // JSON string
+  parameters?: string; // JSON string
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export async function upsertLabReport(
+  labReport: LabReportEntity
+): Promise<void> {
+  const pool = await getConnectionPool();
+  const request = pool.request();
+
+  // Prepare inputs
+  request.input("id", sql.NVarChar, labReport.id);
+  request.input("userId", sql.NVarChar, labReport.userId);
+  request.input("title", sql.NVarChar, labReport.title ?? null);
+  request.input("date", sql.Date, labReport.date ? new Date(labReport.date) : null);
+  request.input("hospital", sql.NVarChar, labReport.hospital ?? null);
+  request.input("doctor", sql.NVarChar, labReport.doctor ?? null);
+  request.input("fileUrl", sql.NVarChar(sql.MAX), labReport.fileUrl ?? null);
+  request.input("rawExtract", sql.NVarChar(sql.MAX), labReport.rawExtract ?? null);
+  request.input("parameters", sql.NVarChar(sql.MAX), labReport.parameters ?? null);
+
+  // Use MERGE (UPSERT) to handle existing records
+  await request.query(`
+    MERGE [dbo].[LabReport] AS target
+    USING (SELECT 
+      @id AS id,
+      @userId AS userId
+    ) AS source
+    ON target.[id] = source.[id]
+    WHEN MATCHED THEN
+      UPDATE SET
+        [title] = @title,
+        [date] = @date,
+        [hospital] = @hospital,
+        [doctor] = @doctor,
+        [fileUrl] = @fileUrl,
+        [rawExtract] = @rawExtract,
+        [parameters] = @parameters,
+        [updatedAt] = GETUTCDATE()
+    WHEN NOT MATCHED THEN
+      INSERT (
+        [id], [userId], [title], [date], [hospital], [doctor], 
+        [fileUrl], [rawExtract], [parameters]
+      )
+      VALUES (
+        @id, @userId, @title, @date, @hospital, @doctor,
+        @fileUrl, @rawExtract, @parameters
+      );
+  `);
+}
+
+export async function getLabReportById(id: string): Promise<LabReportEntity | null> {
+  const pool = await getConnectionPool();
+  const request = pool.request();
+  
+  request.input("id", sql.NVarChar, id);
+  
+  const result = await request.query(`
+    SELECT * FROM LabReport WHERE id = @id
+  `);
+  
+  if (result.recordset.length === 0) {
+    return null;
+  }
+  
+  return result.recordset[0] as LabReportEntity;
+}
+
+export async function getLabReportsByUserId(userId: string): Promise<LabReportEntity[]> {
+  const pool = await getConnectionPool();
+  const request = pool.request();
+  
+  request.input("userId", sql.NVarChar, userId);
+  
+  const result = await request.query(`
+    SELECT * FROM LabReport 
+    WHERE userId = @userId
+    ORDER BY date DESC, createdAt DESC
+  `);
+  
+  return result.recordset as LabReportEntity[];
 }
 

@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Bell, Settings, User, LogOut } from "lucide-react";
+import { Bell, Settings, LogOut } from "lucide-react";
 import { FEATURES, ROUTES } from "@/lib/constants";
 
 export function PatientNavbar() {
@@ -36,18 +35,11 @@ export function PatientNavbar() {
                 <Settings className="h-5 w-5" />
               </Link>
             </Button>
-            <Link href="/profile" className="cursor-pointer">
-              <Avatar className="hover:ring-2 hover:ring-blue-500 transition-all">
-                <AvatarFallback className="bg-blue-600 text-white">
-                  <User className="h-5 w-5" />
-                </AvatarFallback>
-              </Avatar>
-            </Link>
             <Button asChild variant="ghost" size="sm">
-              <Link href="/">
+              <a href="/auth/logout">
                 <LogOut className="h-4 w-4 mr-2" />
                 Sign Out
-              </Link>
+              </a>
             </Button>
           </div>
         </div>

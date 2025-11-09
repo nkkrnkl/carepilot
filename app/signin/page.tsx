@@ -39,14 +39,14 @@ export default function SignInPage() {
           const userResponse = await fetch(`/api/users?emailAddress=${encodeURIComponent(user.email)}`);
           
           if (userResponse.ok) {
-            const userData = await userResponse.json();
-            
-            if (userData.success && userData.user?.userRole) {
-              // User has a role in database, automatically redirect
-              sessionStorage.removeItem("signupRole"); // Clean up
-              router.push(userData.user.userRole === "doctor" ? "/doctorportal" : "/patient");
-              return;
-            }
+          const userData = await userResponse.json();
+          
+          if (userData.success && userData.user?.userRole) {
+            // User has a role in database, automatically redirect
+            sessionStorage.removeItem("signupRole"); // Clean up
+            router.push(userData.user.userRole === "doctor" ? "/doctorportal" : "/patient");
+            return;
+          }
           }
           // If 404 or no role, continue to role selection
           
@@ -77,12 +77,30 @@ export default function SignInPage() {
 
     setCheckingRole(true);
     try {
+      // Extract OAuth information from Auth0 user object
+      const oauthProvider = user.sub?.split('|')[0] || 'auth0'; // e.g., 'google-oauth2', 'auth0'
+      const oauthProviderId = user.sub || null; // Auth0 user ID
+      const oauthEmail = user.email;
+      
+      // Extract name from Auth0 user
+      const nameParts = (user.name || "").split(' ');
+      const firstName = nameParts[0] || "";
+      const lastName = nameParts.slice(1).join(' ') || "";
+
       const response = await fetch("/api/users/role", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email: user.email, role }),
+        body: JSON.stringify({ 
+          email: user.email, 
+          role,
+          oauthProvider,
+          oauthProviderId,
+          oauthEmail,
+          firstName,
+          lastName,
+        }),
       });
 
       const data = await response.json();
@@ -94,8 +112,17 @@ export default function SignInPage() {
       // Clear signup role from sessionStorage
       sessionStorage.removeItem("signupRole");
 
-      // Redirect to appropriate dashboard
-      router.push(role === "doctor" ? "/doctorportal" : "/patient");
+      // Check if profile is complete before redirecting
+      const profileResponse = await fetch(`/api/users/complete-profile?email=${encodeURIComponent(user.email)}`);
+      const profileData = await profileResponse.json();
+      
+      if (profileData.success && !profileData.isComplete) {
+        // Profile is not complete, redirect to profile completion page
+        router.push("/profile-complete");
+      } else {
+        // Profile is complete, redirect to appropriate dashboard
+        router.push(role === "doctor" ? "/doctorportal" : "/patient");
+      }
     } catch (err: any) {
       console.error("Error saving role:", err);
       setCheckingRole(false);

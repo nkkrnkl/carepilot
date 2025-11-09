@@ -69,17 +69,28 @@ export async function setUserRole(role: "patient" | "doctor"): Promise<{ success
     // Check if user exists in database
     let user = await getUserByEmail(userEmail);
 
+    // Extract OAuth information from Auth0 session
+    const oauthProvider = session.user.sub?.split('|')[0] || 'auth0'; // e.g., 'google-oauth2', 'auth0'
+    const oauthProviderId = session.user.sub || null; // Auth0 user ID
+    const oauthEmail = session.user.email || userEmail;
+
     if (user) {
-      // Update existing user with role
-      await updateUser(userEmail, { userRole: role });
+      // Update existing user with role and OAuth info (if not already set)
+      const updates: any = { userRole: role };
+      if (!user.oauth_provider && oauthProviderId) {
+        updates.oauth_provider = oauthProvider;
+        updates.oauth_provider_id = oauthProviderId;
+        updates.oauth_email = oauthEmail;
+      }
+      await updateUser(userEmail, updates);
     } else {
-      // User doesn't exist yet, create a minimal user record with role
+      // User doesn't exist yet, create a minimal user record with role and OAuth info
       const userName = session.user.name || "User";
       const nameParts = userName.split(' ');
       const firstName = nameParts[0] || "User";
       const lastName = nameParts.slice(1).join(' ') || "";
       
-      // Create minimal user record with role
+      // Create minimal user record with role and OAuth information
       await createUser({
         emailAddress: userEmail,
         FirstName: firstName,
@@ -90,6 +101,9 @@ export async function setUserRole(role: "patient" | "doctor"): Promise<{ success
         PatientState: "", // Placeholder
         InsurancePlanType: "Other", // Placeholder
         userRole: role,
+        oauth_provider: oauthProvider,
+        oauth_provider_id: oauthProviderId || undefined,
+        oauth_email: oauthEmail,
       });
     }
 

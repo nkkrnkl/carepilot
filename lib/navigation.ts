@@ -37,12 +37,12 @@ export function useDashboardUrl(): string {
         const userResponse = await fetch(`/api/users?emailAddress=${encodeURIComponent(user.email)}`);
         
         if (userResponse.ok) {
-          const userData = await userResponse.json();
-          
-          if (userData.success && userData.user?.userRole) {
-            setDashboardUrl(userData.user.userRole === 'doctor' ? '/doctorportal' : '/patient');
-          } else {
-            // No role set, default to patient dashboard
+        const userData = await userResponse.json();
+        
+        if (userData.success && userData.user?.userRole) {
+          setDashboardUrl(userData.user.userRole === 'doctor' ? '/doctorportal' : '/patient');
+        } else {
+          // No role set, default to patient dashboard
             setDashboardUrl('/patient');
           }
         } else {

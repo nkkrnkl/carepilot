@@ -21,9 +21,20 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const emailAddress = searchParams.get("emailAddress") || searchParams.get("email");
 
+    console.log("GET /api/users - Email requested:", emailAddress);
+
     if (emailAddress) {
       const user = await getUserByEmail(emailAddress);
+      console.log("Database query result:", {
+        email: emailAddress,
+        found: !!user,
+        userEmail: user?.emailAddress,
+        firstName: user?.FirstName,
+        lastName: user?.LastName
+      });
+      
       if (!user) {
+        console.log("User not found in database for email:", emailAddress);
         return NextResponse.json(
           { success: false, error: "User not found" },
           { status: 404 }

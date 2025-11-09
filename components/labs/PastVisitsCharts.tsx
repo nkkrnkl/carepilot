@@ -52,14 +52,26 @@ export function PastVisitsCharts({ userId = "demo-user" }: PastVisitsChartsProps
       const response = await fetch(`/api/labs/list?userId=${userId}`);
       if (!response.ok) return;
 
-      const reports: LabReport[] = await response.json();
+      const data = await response.json();
+      // API returns { success: true, reports: [...], count: number }
+      const reports: LabReport[] = data.success && Array.isArray(data.reports) 
+        ? data.reports 
+        : Array.isArray(data) 
+        ? data 
+        : [];
 
       // Fetch full data for each report
       const fullReports = await Promise.all(
         reports.map(async (report) => {
-          const detailResponse = await fetch(`/api/labs/get?id=${report.id}`);
+          const detailResponse = await fetch(`/api/labs/get?id=${report.id}&userId=${userId}`);
           if (detailResponse.ok) {
-            return await detailResponse.json();
+            const detailData = await detailResponse.json();
+            // API returns { success: true, report: {...} }
+            return detailData.success && detailData.report 
+              ? detailData.report 
+              : detailData.id 
+              ? detailData 
+              : null;
           }
           return null;
         })
@@ -71,9 +83,52 @@ export function PastVisitsCharts({ userId = "demo-user" }: PastVisitsChartsProps
       fullReports.forEach((report) => {
         if (!report || !report.parameters) return;
 
-        Object.entries(report.parameters).forEach(([paramName, param]: [string, any]) => {
+        // Handle different parameter formats
+        let parametersToProcess: Array<[string, any]> = [];
+        
+        if (report.parameters.table_compact && report.parameters.table_compact.rows) {
+          // Extract from table_compact format (new lab agent format)
+          const rows = report.parameters.table_compact.rows;
+          const columns = report.parameters.table_compact.columns || [];
+          const paramIndex = columns.indexOf('Parameter') >= 0 ? columns.indexOf('Parameter') : 0;
+          const valueIndex = columns.indexOf('Value') >= 0 ? columns.indexOf('Value') : 1;
+          const unitIndex = columns.indexOf('Unit') >= 0 ? columns.indexOf('Unit') : -1;
+          
+          rows.forEach((row: any[]) => {
+            if (row && row.length > paramIndex && row.length > valueIndex) {
+              const paramName = String(row[paramIndex] || '');
+              const paramValue = row[valueIndex] || '';
+              const paramUnit = unitIndex >= 0 && row[unitIndex] ? String(row[unitIndex]) : null;
+              
+              if (paramName && paramValue) {
+                parametersToProcess.push([paramName, { 
+                  value: paramValue, 
+                  unit: paramUnit 
+                }]);
+              }
+            }
+          });
+        } else if (report.parameters.summary_cards && Array.isArray(report.parameters.summary_cards)) {
+          // Extract from summary_cards format
+          report.parameters.summary_cards.forEach((card: any) => {
+            if (card.title && card.value !== undefined) {
+              parametersToProcess.push([card.title, { 
+                value: card.value, 
+                unit: card.unit 
+              }]);
+            }
+          });
+        } else if (typeof report.parameters === 'object' && !Array.isArray(report.parameters)) {
+          // Standard object format (legacy format)
+          parametersToProcess = Object.entries(report.parameters);
+        }
+
+        parametersToProcess.forEach(([paramName, param]: [string, any]) => {
           // Only include numeric values
-          const numValue = typeof param.value === "number" ? param.value : parseFloat(param.value);
+          const numValue = typeof param.value === "number" 
+            ? param.value 
+            : parseFloat(String(param.value || ''));
+          
           if (isNaN(numValue) || !isFinite(numValue)) return;
 
           if (!series[paramName]) {
@@ -81,9 +136,9 @@ export function PastVisitsCharts({ userId = "demo-user" }: PastVisitsChartsProps
           }
 
           series[paramName].push({
-            date: report.date,
+            date: report.date || report.createdAt || new Date().toISOString(),
             value: numValue,
-            unit: param.unit,
+            unit: param.unit || null,
           });
         });
       });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useUser } from '@auth0/nextjs-auth0/client';
 import { useDashboardUrl } from '@/lib/navigation';
+import { Toaster, toast } from "sonner";
 import {
   ArrowLeft,
   User,
@@ -21,11 +22,17 @@ import {
   Mail,
   Phone,
   Shield,
-  FileText
+  FileText,
+  Loader2
 } from "lucide-react";
 
 export default function ProfilePage() {
   const dashboardUrl = useDashboardUrl();
+  const { user: auth0User, isLoading: userLoading } = useUser();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  
   const [formData, setFormData] = useState({
     // Personal Information
     firstName: "",
@@ -51,23 +58,152 @@ export default function ProfilePage() {
     insuranceCompanyPhone: "",
   });
 
-  const [isSaved, setIsSaved] = useState(false);
+  // Load user data from Azure SQL Server when component mounts
+  useEffect(() => {
+    async function loadUserData() {
+      if (!auth0User?.email || userLoading) {
+        setLoading(false);
+        return;
+      }
 
-  const handleSubmit = (e: React.FormEvent) => {
+      try {
+        setLoading(true);
+        console.log("Loading profile for authenticated user:", auth0User.email);
+        
+        const response = await fetch(`/api/users?emailAddress=${encodeURIComponent(auth0User.email)}`);
+        const data = await response.json();
+
+        console.log("Profile API response:", { 
+          success: data.success, 
+          hasUser: !!data.user,
+          userEmail: data.user?.emailAddress,
+          requestedEmail: auth0User.email 
+        });
+
+        if (data.success && data.user) {
+          const user = data.user;
+          console.log("Loading user data from database:", {
+            email: user.emailAddress,
+            firstName: user.FirstName,
+            lastName: user.LastName,
+            dateOfBirth: user.DateOfBirth
+          });
+          
+          // Map database fields to form fields
+          setFormData({
+            firstName: user.FirstName || "",
+            lastName: user.LastName || "",
+            dateOfBirth: user.DateOfBirth || "",
+            email: user.emailAddress || auth0User.email || "",
+            phone: user.InsuranceCompanyPhoneNumber || "", // Using insurance phone as general phone for now
+            address: user.StreetAddress || "",
+            city: user.PatientCity || "",
+            state: user.PatientState || "",
+            zipCode: "", // ZipCode not in user_table schema
+            preferredLanguage: "English", // Not in schema
+            insuranceCompany: "", // Not directly in schema (would need insurer_table join)
+            insuranceAccountNumber: "", // Not in schema
+            insuranceGroupNumber: user.InsuranceGroupNumber || "",
+            insurancePlanType: user.InsurancePlanType || "",
+            insuranceCompanyAddress: user.InsuranceCompanyStreetAddress || "",
+            insuranceCompanyCity: user.InsuranceCompanyCity || "",
+            insuranceCompanyState: user.InsuranceCompanyState || "",
+            insuranceCompanyZipCode: "", // Not in schema
+            insuranceCompanyPhone: user.InsuranceCompanyPhoneNumber || "",
+          });
+        } else if (response.status === 404) {
+          // User doesn't exist in database yet - show empty form with email
+          console.log("User not found in database, showing empty form");
+          setFormData(prev => ({
+            ...prev,
+            email: auth0User.email || "",
+          }));
+          toast.info("Profile not found. Please complete your profile information.");
+        } else {
+          console.error("Failed to load user data:", data.error);
+          toast.error(data.error || "Failed to load profile data");
+        }
+      } catch (error) {
+        console.error("Error loading user data:", error);
+        toast.error("Failed to load profile data. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadUserData();
+  }, [auth0User, userLoading]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, this would save to backend
-    console.log("Saving profile:", formData);
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 3000);
-    // Here you would typically call an API to save the data
+    
+    if (!auth0User?.email) {
+      toast.error("You must be logged in to save your profile");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // Map form fields back to database fields
+      const updateData = {
+        emailAddress: auth0User.email,
+        FirstName: formData.firstName.trim(),
+        LastName: formData.lastName.trim(),
+        DateOfBirth: formData.dateOfBirth.trim(),
+        StreetAddress: formData.address.trim(),
+        PatientCity: formData.city.trim(),
+        PatientState: formData.state.trim().toUpperCase(),
+        InsuranceGroupNumber: formData.insuranceGroupNumber.trim() || null,
+        InsurancePlanType: formData.insurancePlanType.trim(),
+        InsuranceCompanyStreetAddress: formData.insuranceCompanyAddress.trim() || null,
+        InsuranceCompanyCity: formData.insuranceCompanyCity.trim() || null,
+        InsuranceCompanyState: formData.insuranceCompanyState.trim() || null,
+        InsuranceCompanyPhoneNumber: formData.insuranceCompanyPhone.trim() || null,
+      };
+
+      const response = await fetch("/api/users", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updateData),
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || "Failed to save profile");
+      }
+
+      setIsSaved(true);
+      toast.success("Profile saved successfully!");
+      setTimeout(() => setIsSaved(false), 3000);
+    } catch (error: any) {
+      console.error("Error saving profile:", error);
+      toast.error(error.message || "Failed to save profile");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  if (userLoading || loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-blue-100/20 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+          <p className="text-gray-600">Loading your profile...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-blue-100/20">
+      <Toaster />
       {/* Navigation */}
       <nav className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -175,33 +311,24 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-2 block flex items-center gap-2">
-                    <Mail className="h-4 w-4" />
-                    Email Address *
-                  </label>
-                  <Input
-                    required
-                    type="email"
-                    placeholder="john.doe@example.com"
-                    value={formData.email}
-                    onChange={(e) => handleChange("email", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-2 block flex items-center gap-2">
-                    <Phone className="h-4 w-4" />
-                    Phone Number *
-                  </label>
-                  <Input
-                    required
-                    type="tel"
-                    placeholder="+1 (555) 123-4567"
-                    value={formData.phone}
-                    onChange={(e) => handleChange("phone", e.target.value)}
-                  />
-                </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-2 block flex items-center gap-2">
+                  <Mail className="h-4 w-4" />
+                  Email Address
+                </label>
+                <Input
+                  type="email"
+                  placeholder={auth0User?.email || "your.email@example.com"}
+                  value={formData.email || auth0User?.email || ""}
+                  disabled
+                  className="bg-gray-100 cursor-not-allowed"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Email is your primary key and cannot be changed. 
+                  {auth0User?.email && (
+                    <span className="block mt-1 font-semibold">Authenticated as: {auth0User.email}</span>
+                  )}
+                </p>
               </div>
 
               <div>
@@ -217,7 +344,7 @@ export default function ProfilePage() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-gray-700 mb-2 block">
                     City *
@@ -237,20 +364,21 @@ export default function ProfilePage() {
                     required
                     placeholder="MA"
                     value={formData.state}
-                    onChange={(e) => handleChange("state", e.target.value)}
+                    onChange={(e) => handleChange("state", e.target.value.toUpperCase())}
+                    maxLength={2}
                   />
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700 mb-2 block">
-                    Zip Code *
-                  </label>
-                  <Input
-                    required
-                    placeholder="02139"
-                    value={formData.zipCode}
-                    onChange={(e) => handleChange("zipCode", e.target.value)}
-                  />
-                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-2 block">
+                  Zip Code
+                </label>
+                <Input
+                  placeholder="02139"
+                  value={formData.zipCode}
+                  onChange={(e) => handleChange("zipCode", e.target.value)}
+                />
+                <p className="text-xs text-gray-500 mt-1">Optional - not stored in database</p>
               </div>
             </CardContent>
           </Card>
@@ -272,28 +400,32 @@ export default function ProfilePage() {
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-2 block flex items-center gap-2">
                   <Building className="h-4 w-4" />
-                  Insurance Company *
+                  Insurance Company
                 </label>
                 <Input
-                  required
                   placeholder="Blue Cross Blue Shield"
                   value={formData.insuranceCompany}
                   onChange={(e) => handleChange("insuranceCompany", e.target.value)}
+                  disabled
+                  className="bg-gray-100 cursor-not-allowed"
                 />
+                <p className="text-xs text-gray-500 mt-1">Managed through insurer_table (read-only)</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-gray-700 mb-2 block flex items-center gap-2">
                     <CreditCard className="h-4 w-4" />
-                    Account Number *
+                    Account Number
                   </label>
                   <Input
-                    required
                     placeholder="123456789"
                     value={formData.insuranceAccountNumber}
                     onChange={(e) => handleChange("insuranceAccountNumber", e.target.value)}
+                    disabled
+                    className="bg-gray-100 cursor-not-allowed"
                   />
+                  <p className="text-xs text-gray-500 mt-1">Not stored in database</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-700 mb-2 block">
@@ -309,20 +441,21 @@ export default function ProfilePage() {
 
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-2 block">
-                  Plan Type
+                  Plan Type *
                 </label>
                 <select
                   value={formData.insurancePlanType}
                   onChange={(e) => handleChange("insurancePlanType", e.target.value)}
                   className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                  required
                 >
                   <option value="">Select plan type</option>
-                  <option value="hmo">HMO</option>
-                  <option value="ppo">PPO</option>
-                  <option value="epo">EPO</option>
-                  <option value="pos">POS</option>
-                  <option value="hdhp">HDHP</option>
-                  <option value="other">Other</option>
+                  <option value="HMO">HMO</option>
+                  <option value="PPO">PPO</option>
+                  <option value="EPO">EPO</option>
+                  <option value="POS">POS</option>
+                  <option value="HDHP">HDHP</option>
+                  <option value="Other">Other</option>
                 </select>
               </div>
 
@@ -360,16 +493,6 @@ export default function ProfilePage() {
                       onChange={(e) => handleChange("insuranceCompanyState", e.target.value)}
                     />
                   </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 mb-2 block">
-                      Zip Code
-                    </label>
-                    <Input
-                      placeholder="02101"
-                      value={formData.insuranceCompanyZipCode}
-                      onChange={(e) => handleChange("insuranceCompanyZipCode", e.target.value)}
-                    />
-                  </div>
                 </div>
                 <div className="mt-4">
                   <label className="text-sm font-medium text-gray-700 mb-2 block flex items-center gap-2">
@@ -397,9 +520,19 @@ export default function ProfilePage() {
               type="submit" 
               size="lg" 
               className="bg-blue-600 hover:bg-blue-700 text-white px-8"
+              disabled={saving}
             >
-              <Save className="h-4 w-4 mr-2" />
-              Save Profile
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Profile
+                </>
+              )}
             </Button>
           </div>
         </form>

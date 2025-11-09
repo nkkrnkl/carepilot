@@ -283,10 +283,10 @@ export default function DoctorsDashboard() {
             <AvatarFallback className="bg-blue-600 text-white">DS</AvatarFallback>
           </Avatar>
           <Button asChild variant="ghost" size="sm">
-            <Link href="/">
+            <a href="/auth/logout">
               <LogOut className="h-4 w-4 mr-2" />
               Sign Out
-            </Link>
+            </a>
           </Button>
         </div>
       </div>

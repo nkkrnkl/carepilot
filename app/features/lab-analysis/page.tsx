@@ -16,10 +16,11 @@ import { useDashboardUrl } from '@/lib/navigation';
 interface LabReport {
   id: string;
   title: string;
-  date: string;
-  hospital: string | null;
-  doctor: string | null;
-  parameters: Record<string, { value: string | number; unit?: string | null; referenceRange?: string | null }>;
+  date?: string | null;
+  createdAt?: string | null;
+  hospital?: string | null;
+  doctor?: string | null;
+  parameters: Record<string, { value: string | number; unit?: string | null; referenceRange?: string | null }> | any;
 }
 
 export default function LabsPage() {
@@ -43,12 +44,22 @@ export default function LabsPage() {
   async function loadReport(reportId: string) {
     try {
       setLoading(true);
-      const response = await fetch(`/api/labs/get?id=${reportId}`);
+      const response = await fetch(`/api/labs/get?id=${reportId}&userId=${userId}`);
       if (response.ok) {
         const data = await response.json();
-        setSelectedReport(data);
+        // API returns { success: true, report: {...} }
+        if (data.success && data.report) {
+          setSelectedReport(data.report);
+        } else {
+          // Fallback: if data is already the report object (backward compatibility)
+          setSelectedReport(data.id ? data : null);
+          if (!data.id) {
+            toast.error("Invalid report data received");
+          }
+        }
       } else {
-        toast.error("Failed to load report");
+        const errorData = await response.json().catch(() => ({}));
+        toast.error(errorData.error || "Failed to load report");
       }
     } catch (error) {
       console.error("Failed to load report:", error);
@@ -104,19 +115,27 @@ export default function LabsPage() {
 
       {/* Main Content */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Two-Column Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          {/* Left: Upload PDF */}
+        {/* Upload Lab Report Section - Similar to Landing Page */}
+        <div className="max-w-4xl mx-auto mb-12">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">Upload Your Lab Report</h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Upload PDF lab reports to analyze your lab results. Your documents will be processed, 
+              parameters extracted, and stored for detailed analysis and tracking over time.
+            </p>
+          </div>
           <DocumentUploadSimple
             userId={userId}
             defaultDocType="lab_report"
             showDocTypeSelector={false}
-            title="Upload Lab Report"
-            description="Upload PDF lab reports to analyze your lab results. Files will be processed and stored for analysis."
+            title="Upload Lab Report PDF"
+            description="Drag and drop your lab report PDF file or click to select. The document will be automatically processed and analyzed."
             onUploadComplete={handleUploadSuccess}
           />
+        </div>
 
-          {/* Right: View Previous Reports */}
+        {/* Previous Reports Section */}
+        <div className="max-w-4xl mx-auto mb-8">
           <PreviousReports
             userId={userId}
             onSelectReport={handleSelectReport}

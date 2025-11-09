@@ -13,10 +13,11 @@ interface LabParameter {
 interface LabReport {
   id: string;
   title: string;
-  date: string;
-  hospital: string | null;
-  doctor: string | null;
-  parameters: Record<string, LabParameter>; // Key is the parameter name
+  date?: string | null;
+  createdAt?: string | null;
+  hospital?: string | null;
+  doctor?: string | null;
+  parameters: Record<string, LabParameter> | any; // Key is the parameter name, or lab agent format
 }
 
 interface CurrentDataCardsProps {
@@ -175,7 +176,67 @@ export function CurrentDataCards({ report }: CurrentDataCardsProps) {
     }
   }
 
-  const parameters = Object.entries(report.parameters);
+  // Transform parameters from lab agent format to expected format
+  function transformParameters(params: any): Record<string, LabParameter> {
+    if (!params) return {};
+    
+    // If already in the expected format (Record<string, LabParameter>)
+    if (typeof params === 'object' && !Array.isArray(params) && !params.table_compact && !params.summary_cards) {
+      return params;
+    }
+    
+    const transformed: Record<string, LabParameter> = {};
+    
+    // Handle table_compact format (new lab agent format)
+    if (params.table_compact && params.table_compact.rows) {
+      const rows = params.table_compact.rows;
+      const columns = params.table_compact.columns || [];
+      const paramIndex = columns.indexOf('Parameter') >= 0 ? columns.indexOf('Parameter') : 0;
+      const valueIndex = columns.findIndex((col: string) => 
+        col.toLowerCase().includes('value') || col.toLowerCase().includes('result')
+      );
+      const unitIndex = columns.findIndex((col: string) => 
+        col.toLowerCase().includes('unit')
+      );
+      const rangeIndex = columns.findIndex((col: string) => 
+        col.toLowerCase().includes('range') || col.toLowerCase().includes('reference')
+      );
+      
+      rows.forEach((row: any[]) => {
+        if (row && row.length > paramIndex && row.length > valueIndex) {
+          const paramName = String(row[paramIndex] || '').trim();
+          if (!paramName) return;
+          
+          const paramValue = row[valueIndex] || '';
+          const paramUnit = unitIndex >= 0 && row[unitIndex] ? String(row[unitIndex]) : null;
+          const paramRange = rangeIndex >= 0 && row[rangeIndex] ? String(row[rangeIndex]) : null;
+          
+          transformed[paramName] = {
+            value: paramValue,
+            unit: paramUnit || undefined,
+            referenceRange: paramRange || undefined,
+          };
+        }
+      });
+    }
+    
+    // Also handle summary_cards format
+    if (params.summary_cards && Array.isArray(params.summary_cards)) {
+      params.summary_cards.forEach((card: any) => {
+        if (card.title) {
+          transformed[card.title] = {
+            value: card.value || '',
+            unit: card.unit || undefined,
+            referenceRange: card.detail || undefined,
+          };
+        }
+      });
+    }
+    
+    return transformed;
+  }
+
+  const parameters = Object.entries(transformParameters(report.parameters));
 
   return (
     <div className="space-y-6">
@@ -217,7 +278,9 @@ export function CurrentDataCards({ report }: CurrentDataCardsProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-lg font-semibold">{formatDate(report.date)}</p>
+            <p className="text-lg font-semibold">
+              {report.date ? formatDate(report.date) : report.createdAt ? formatDate(report.createdAt) : "N/A"}
+            </p>
           </CardContent>
         </Card>
       </div>

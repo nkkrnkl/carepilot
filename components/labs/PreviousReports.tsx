@@ -39,10 +39,20 @@ export function PreviousReports({
       const response = await fetch(`/api/labs/list?userId=${userId}`);
       if (response.ok) {
         const data = await response.json();
-        setReports(data);
+        // API returns { success: true, reports: [...], count: number }
+        if (data.success && Array.isArray(data.reports)) {
+          setReports(data.reports);
+        } else {
+          // Fallback: if data is already an array (backward compatibility)
+          setReports(Array.isArray(data) ? data : []);
+        }
+      } else {
+        // If response is not ok, set empty array
+        setReports([]);
       }
     } catch (error) {
       console.error("Failed to fetch reports:", error);
+      setReports([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
