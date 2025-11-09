@@ -17,6 +17,10 @@ interface UploadedFile {
 interface DocumentUploadSimpleProps {
   userId?: string;
   onUploadComplete?: (file: UploadedFile) => void;
+  defaultDocType?: "plan_document" | "lab_report" | "eob";
+  showDocTypeSelector?: boolean;
+  title?: string;
+  description?: string;
 }
 
 const DOCUMENT_TYPES = [
@@ -39,11 +43,15 @@ const DOCUMENT_TYPES = [
 
 export function DocumentUploadSimple({ 
   userId = "user-123", 
-  onUploadComplete 
+  onUploadComplete,
+  defaultDocType = "plan_document",
+  showDocTypeSelector = true,
+  title = "Upload PDF Documents",
+  description = "Upload PDF documents to be chunked, embedded, and stored in the vector database"
 }: DocumentUploadSimpleProps) {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [dragActive, setDragActive] = useState(false);
-  const [selectedType, setSelectedType] = useState<"plan_document" | "lab_report" | "eob">("plan_document");
+  const [selectedType, setSelectedType] = useState<"plan_document" | "lab_report" | "eob">(defaultDocType);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -55,49 +63,7 @@ export function DocumentUploadSimple({
     }
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFiles(Array.from(e.dataTransfer.files));
-    }
-  }, [selectedType]);
-
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      handleFiles(Array.from(e.target.files));
-    }
-  };
-
-  const handleFiles = async (files: File[]) => {
-    // Filter for PDF files only
-    const pdfFiles = files.filter(file => 
-      file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
-    );
-
-    if (pdfFiles.length === 0) {
-      alert("Please upload PDF files only");
-      return;
-    }
-
-    const newFiles: UploadedFile[] = pdfFiles.map((file) => ({
-      id: `${Date.now()}-${Math.random()}`,
-      file,
-      type: selectedType,
-      status: "pending" as const,
-    }));
-
-    setUploadedFiles((prev) => [...prev, ...newFiles]);
-
-    // Upload each file
-    for (const fileData of newFiles) {
-      await uploadFile(fileData);
-    }
-  };
-
-  const uploadFile = async (fileData: UploadedFile) => {
+  const uploadFile = useCallback(async (fileData: UploadedFile) => {
     // Update status to uploading
     setUploadedFiles((prev) =>
       prev.map((f) =>
@@ -124,23 +90,23 @@ export function DocumentUploadSimple({
 
       const result = await response.json();
 
+      // Create the completed file object
+      const completedFile: UploadedFile = {
+        ...fileData,
+        status: "success" as const,
+        chunkCount: result.chunkCount
+      };
+
+      // Update state
       setUploadedFiles((prev) =>
         prev.map((f) =>
-          f.id === fileData.id
-            ? { 
-                ...f, 
-                status: "success" as const,
-                chunkCount: result.chunkCount 
-              }
-            : f
+          f.id === fileData.id ? completedFile : f
         )
       );
 
+      // Call onUploadComplete callback
       if (onUploadComplete) {
-        const completedFile = uploadedFiles.find(f => f.id === fileData.id);
-        if (completedFile) {
-          onUploadComplete({ ...completedFile, status: "success", chunkCount: result.chunkCount });
-        }
+        onUploadComplete(completedFile);
       }
     } catch (error) {
       setUploadedFiles((prev) =>
@@ -155,6 +121,48 @@ export function DocumentUploadSimple({
         )
       );
     }
+  }, [userId, onUploadComplete]);
+
+  const handleFiles = useCallback(async (files: File[]) => {
+    // Filter for PDF files only
+    const pdfFiles = files.filter(file => 
+      file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
+    );
+
+    if (pdfFiles.length === 0) {
+      alert("Please upload PDF files only");
+      return;
+    }
+
+    const newFiles: UploadedFile[] = pdfFiles.map((file) => ({
+      id: `${Date.now()}-${Math.random()}`,
+      file,
+      type: selectedType,
+      status: "pending" as const,
+    }));
+
+    setUploadedFiles((prev) => [...prev, ...newFiles]);
+
+    // Upload each file
+    for (const fileData of newFiles) {
+      await uploadFile(fileData);
+    }
+  }, [selectedType, uploadFile]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFiles(Array.from(e.dataTransfer.files));
+    }
+  }, [handleFiles]);
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFiles(Array.from(e.target.files));
+    }
   };
 
   const removeFile = (id: string) => {
@@ -164,32 +172,34 @@ export function DocumentUploadSimple({
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>Upload PDF Documents</CardTitle>
+        <CardTitle>{title}</CardTitle>
         <CardDescription>
-          Upload PDF documents to be chunked, embedded, and stored in the vector database
+          {description}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Document Type Selector */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700">
-            Document Type
-          </label>
-          <select
-            value={selectedType}
-            onChange={(e) => setSelectedType(e.target.value as typeof selectedType)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            {DOCUMENT_TYPES.map((type) => (
-              <option key={type.value} value={type.value}>
-                {type.label}
-              </option>
-            ))}
-          </select>
-          <p className="text-xs text-gray-500">
-            {DOCUMENT_TYPES.find(t => t.value === selectedType)?.description}
-          </p>
-        </div>
+        {showDocTypeSelector && (
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              Document Type
+            </label>
+            <select
+              value={selectedType}
+              onChange={(e) => setSelectedType(e.target.value as typeof selectedType)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {DOCUMENT_TYPES.map((type) => (
+                <option key={type.value} value={type.value}>
+                  {type.label}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500">
+              {DOCUMENT_TYPES.find(t => t.value === selectedType)?.description}
+            </p>
+          </div>
+        )}
 
         {/* Upload Area */}
         <div

@@ -1,22 +1,18 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
+import { DocumentUploadSimple } from "@/components/documents/document-upload-simple";
 import { 
   Beaker,
   TrendingUp,
   AlertTriangle,
   MessageSquare,
   ArrowLeft,
-  CheckCircle2,
   BarChart3,
-  Upload,
-  X,
-  Loader2
 } from "lucide-react";
 
 const capabilities = [
@@ -53,77 +49,13 @@ const capabilities = [
 ];
 
 export default function LabAnalysisPage() {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadStatus, setUploadStatus] = useState<{
-    success: boolean;
-    message: string;
-    resultsCount?: number;
-  } | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadComplete, setUploadComplete] = useState(false);
 
-  function handleFileSelect(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      setUploadStatus(null);
-    }
-  }
-
-  function handleClear() {
-    setSelectedFile(null);
-    setUploadStatus(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  }
-
-  async function handleUpload() {
-    if (!selectedFile) return;
-
-    setUploading(true);
-    setUploadStatus(null);
-
-    try {
-      const formData = new FormData();
-      formData.append("file", selectedFile);
-      formData.append("userId", "default-user"); // In production, get from auth
-
-      console.log("[client] Uploading lab report:", selectedFile.name);
-
-      const res = await fetch("/api/labs/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Upload failed");
-      }
-
-      console.log("[client] Upload successful:", data);
-      setUploadStatus({
-        success: true,
-        message: data.message || "Lab report uploaded successfully",
-        resultsCount: data.resultsCount,
-      });
-
-      // Clear file selection
-      setSelectedFile(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    } catch (error) {
-      console.error("[client] Upload error:", error);
-      setUploadStatus({
-        success: false,
-        message: error instanceof Error ? error.message : "Upload failed",
-      });
-    } finally {
-      setUploading(false);
-    }
-  }
+  const handleUploadComplete = (file: any) => {
+    console.log("Lab report upload complete:", file);
+    setUploadComplete(true);
+    // You can add additional logic here, like refreshing the lab reports list
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
@@ -165,101 +97,16 @@ export default function LabAnalysisPage() {
         </div>
 
         {/* Upload Section */}
-        <Card className="border-2 mb-8">
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold">Upload Lab Report</CardTitle>
-            <CardDescription>Upload PDF, PNG, or JPG files to analyze your lab results</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="relative">
-              <label
-                htmlFor="file-upload"
-                className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-muted-foreground/25 rounded-lg cursor-pointer hover:border-primary/50 transition-colors bg-muted/30"
-              >
-                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                  <Upload className="h-10 w-10 text-muted-foreground mb-3" />
-                  <p className="mb-2 text-sm text-muted-foreground">
-                    <span className="font-semibold">Click to upload</span> or drag and drop
-                  </p>
-                  <p className="text-xs text-muted-foreground">PDF, PNG, or JPG (MAX. 10MB)</p>
-                </div>
-                <Input
-                  id="file-upload"
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,.png,.jpg,.jpeg"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                  disabled={uploading}
-                />
-              </label>
-            </div>
-
-            {selectedFile && (
-              <div className="flex items-center justify-between p-3 bg-muted rounded-md">
-                <span className="text-sm text-muted-foreground truncate flex-1">
-                  {selectedFile.name}
-                </span>
-                <div className="flex gap-2 ml-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleClear}
-                    disabled={uploading}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={handleUpload}
-                    disabled={uploading}
-                  >
-                    {uploading ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      "Upload & Analyze"
-                    )}
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {uploadStatus && (
-              <div
-                className={`p-4 rounded-md ${
-                  uploadStatus.success
-                    ? "bg-green-50 border border-green-200"
-                    : "bg-red-50 border border-red-200"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  {uploadStatus.success ? (
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                  ) : (
-                    <AlertTriangle className="h-5 w-5 text-red-600" />
-                  )}
-                  <div>
-                    <p
-                      className={`text-sm font-medium ${
-                        uploadStatus.success ? "text-green-800" : "text-red-800"
-                      }`}
-                    >
-                      {uploadStatus.message}
-                    </p>
-                    {uploadStatus.success && uploadStatus.resultsCount !== undefined && (
-                      <p className="text-xs text-green-600 mt-1">
-                        {uploadStatus.resultsCount} lab result{uploadStatus.resultsCount !== 1 ? "s" : ""} extracted
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <div className="mb-8">
+          <DocumentUploadSimple
+            userId="default-user" // TODO: Get from authentication context
+            defaultDocType="lab_report"
+            showDocTypeSelector={false}
+            title="Upload Lab Report"
+            description="Upload PDF lab reports to analyze your lab results. Files will be processed and stored for analysis."
+            onUploadComplete={handleUploadComplete}
+          />
+        </div>
 
         {/* Key Features */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
