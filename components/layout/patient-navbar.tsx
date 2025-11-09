@@ -16,13 +16,13 @@ export function PatientNavbar() {
             </Link>
             <div className="hidden md:flex items-center gap-6">
               {FEATURES.map((feature) => (
-                <a
+                <Link
                   key={feature.id}
-                  href={`#${feature.id}`}
-                  className="text-gray-700 hover:text-blue-600 transition-colors scroll-smooth"
+                  href={feature.link}
+                  className="text-gray-700 hover:text-blue-600 transition-colors"
                 >
                   {feature.title}
-                </a>
+                </Link>
               ))}
             </div>
           </div>

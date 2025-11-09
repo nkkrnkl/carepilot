@@ -1068,3 +1068,184 @@ export async function getLabReportsByUserId(userId: string): Promise<LabReportEn
   return result.recordset as LabReportEntity[];
 }
 
+// ============================================================================
+// EOB RECORDS OPERATIONS
+// ============================================================================
+
+export interface EOBRecordEntity {
+  id?: number;
+  user_id: string;
+  claim_number: string;
+  member_name: string;
+  member_address?: string;
+  member_id?: string;
+  group_number?: string;
+  claim_date?: string;
+  provider_name: string;
+  provider_npi?: string;
+  total_billed: number;
+  total_benefits_approved: number;
+  amount_you_owe: number;
+  services?: string; // JSON string
+  coverage_breakdown?: string; // JSON string
+  insurance_provider?: string;
+  plan_name?: string;
+  policy_number?: string;
+  alerts?: string; // JSON string
+  discrepancies?: string; // JSON string
+  source_document_id?: string;
+  extracted_date?: Date;
+  created_at?: Date;
+  updated_at?: Date;
+}
+
+export async function upsertEOBRecord(
+  eobRecord: EOBRecordEntity
+): Promise<void> {
+  const pool = await getConnectionPool();
+  const request = pool.request();
+
+  // Prepare inputs
+  request.input("user_id", sql.NVarChar, eobRecord.user_id);
+  request.input("claim_number", sql.NVarChar, eobRecord.claim_number);
+  request.input("member_name", sql.NVarChar, eobRecord.member_name);
+  request.input("member_address", sql.NVarChar(sql.MAX), eobRecord.member_address ?? null);
+  request.input("member_id", sql.NVarChar, eobRecord.member_id ?? null);
+  request.input("group_number", sql.NVarChar, eobRecord.group_number ?? null);
+  request.input("claim_date", sql.Date, eobRecord.claim_date ? new Date(eobRecord.claim_date) : null);
+  request.input("provider_name", sql.NVarChar, eobRecord.provider_name);
+  request.input("provider_npi", sql.NVarChar, eobRecord.provider_npi ?? null);
+  request.input("total_billed", sql.Decimal(10, 2), eobRecord.total_billed);
+  request.input("total_benefits_approved", sql.Decimal(10, 2), eobRecord.total_benefits_approved);
+  request.input("amount_you_owe", sql.Decimal(10, 2), eobRecord.amount_you_owe);
+  request.input("services", sql.NVarChar(sql.MAX), eobRecord.services ?? null);
+  request.input("coverage_breakdown", sql.NVarChar(sql.MAX), eobRecord.coverage_breakdown ?? null);
+  request.input("insurance_provider", sql.NVarChar, eobRecord.insurance_provider ?? null);
+  request.input("plan_name", sql.NVarChar, eobRecord.plan_name ?? null);
+  request.input("policy_number", sql.NVarChar, eobRecord.policy_number ?? null);
+  request.input("alerts", sql.NVarChar(sql.MAX), eobRecord.alerts ?? null);
+  request.input("discrepancies", sql.NVarChar(sql.MAX), eobRecord.discrepancies ?? null);
+  request.input("source_document_id", sql.NVarChar, eobRecord.source_document_id ?? null);
+
+  // Use MERGE (UPSERT) to handle unique constraint on (claim_number, user_id)
+  await request.query(`
+    MERGE [dbo].[eob_records] AS target
+    USING (SELECT 
+      @claim_number AS claim_number,
+      @user_id AS user_id
+    ) AS source
+    ON target.[claim_number] = source.[claim_number] 
+      AND target.[user_id] = source.[user_id]
+    WHEN MATCHED THEN
+      UPDATE SET
+        [member_name] = @member_name,
+        [member_address] = @member_address,
+        [member_id] = @member_id,
+        [group_number] = @group_number,
+        [claim_date] = @claim_date,
+        [provider_name] = @provider_name,
+        [provider_npi] = @provider_npi,
+        [total_billed] = @total_billed,
+        [total_benefits_approved] = @total_benefits_approved,
+        [amount_you_owe] = @amount_you_owe,
+        [services] = @services,
+        [coverage_breakdown] = @coverage_breakdown,
+        [insurance_provider] = @insurance_provider,
+        [plan_name] = @plan_name,
+        [policy_number] = @policy_number,
+        [alerts] = @alerts,
+        [discrepancies] = @discrepancies,
+        [source_document_id] = @source_document_id,
+        [updated_at] = GETUTCDATE()
+    WHEN NOT MATCHED THEN
+      INSERT (
+        [user_id], [claim_number], [member_name], [member_address], [member_id], [group_number],
+        [claim_date], [provider_name], [provider_npi], [total_billed], [total_benefits_approved],
+        [amount_you_owe], [services], [coverage_breakdown], [insurance_provider], [plan_name],
+        [policy_number], [alerts], [discrepancies], [source_document_id]
+      )
+      VALUES (
+        @user_id, @claim_number, @member_name, @member_address, @member_id, @group_number,
+        @claim_date, @provider_name, @provider_npi, @total_billed, @total_benefits_approved,
+        @amount_you_owe, @services, @coverage_breakdown, @insurance_provider, @plan_name,
+        @policy_number, @alerts, @discrepancies, @source_document_id
+      );
+  `);
+}
+
+export async function getEOBRecordById(id: number): Promise<EOBRecordEntity | null> {
+  const pool = await getConnectionPool();
+  const request = pool.request();
+  
+  request.input("id", sql.Int, id);
+  
+  const result = await request.query(`
+    SELECT * FROM eob_records WHERE id = @id
+  `);
+  
+  if (result.recordset.length === 0) {
+    return null;
+  }
+  
+  return result.recordset[0] as EOBRecordEntity;
+}
+
+export async function getEOBRecordByClaimNumber(
+  claimNumber: string,
+  userId: string
+): Promise<EOBRecordEntity | null> {
+  const pool = await getConnectionPool();
+  const request = pool.request();
+  
+  request.input("claim_number", sql.NVarChar, claimNumber);
+  request.input("user_id", sql.NVarChar, userId);
+  
+  const result = await request.query(`
+    SELECT * FROM eob_records 
+    WHERE claim_number = @claim_number AND user_id = @user_id
+  `);
+  
+  if (result.recordset.length === 0) {
+    return null;
+  }
+  
+  return result.recordset[0] as EOBRecordEntity;
+}
+
+export async function getEOBRecordsByUserId(userId: string): Promise<EOBRecordEntity[]> {
+  const pool = await getConnectionPool();
+  const request = pool.request();
+  
+  request.input("user_id", sql.NVarChar, userId);
+  
+  const result = await request.query(`
+    SELECT * FROM eob_records 
+    WHERE user_id = @user_id
+    ORDER BY claim_date DESC, created_at DESC
+  `);
+  
+  return result.recordset as EOBRecordEntity[];
+}
+
+export async function getEOBRecordByDocumentId(
+  documentId: string,
+  userId: string
+): Promise<EOBRecordEntity | null> {
+  const pool = await getConnectionPool();
+  const request = pool.request();
+  
+  request.input("source_document_id", sql.NVarChar, documentId);
+  request.input("user_id", sql.NVarChar, userId);
+  
+  const result = await request.query(`
+    SELECT * FROM eob_records 
+    WHERE source_document_id = @source_document_id AND user_id = @user_id
+  `);
+  
+  if (result.recordset.length === 0) {
+    return null;
+  }
+  
+  return result.recordset[0] as EOBRecordEntity;
+}
+

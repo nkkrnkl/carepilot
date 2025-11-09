@@ -367,6 +367,7 @@ export async function POST(request: NextRequest) {
     // Step 5: If document type is EOB, automatically extract EOB information
     if (docType === "eob") {
       try {
+        console.log("Starting EOB extraction using CoT agent...");
         const eobExtractScriptPath = join(process.cwd(), "backend", "scripts", "extract_eob.py");
         const eobResult = await executePython(eobExtractScriptPath, {
           userId,
@@ -375,62 +376,81 @@ export async function POST(request: NextRequest) {
           method: "cot",
         });
 
-        if (eobResult.success && eobResult.data) {
-          // Save EOB data to cases JSON file
+        console.log("EOB extraction result:", {
+          success: eobResult.success,
+          error: eobResult.error,
+          hasData: !!eobResult.data,
+          dataKeys: eobResult.data ? Object.keys(eobResult.data) : [],
+        });
+
+        if (eobResult.success && eobResult.data?.eob_data) {
+          console.log("EOB extracted successfully, storing in SQL database...");
+          
           try {
-            const casesJsonPath = join(process.cwd(), `eob_output_all_${userId}.json`);
-            let casesData: any = {
-              total_documents: 0,
-              results: [],
+            // Import SQL storage function
+            const { upsertEOBRecord } = await import("@/lib/azure/sql-storage");
+            
+            // Transform EOB data to match SQL schema
+            const eobData = eobResult.data.eob_data;
+            
+            // Helper function to convert null to undefined for optional fields
+            const valueOrUndefined = <T>(value: T | null | undefined): T | undefined => {
+              return value === null ? undefined : value;
             };
 
-            // Read existing cases data if file exists
-            if (existsSync(casesJsonPath)) {
-              try {
-                const fileContent = await readFile(casesJsonPath, "utf-8");
-                casesData = JSON.parse(fileContent);
-              } catch (readError) {
-                console.warn("Error reading existing cases file, creating new one:", readError);
-              }
-            }
-
-            // Check if this document already exists
-            const existingIndex = casesData.results.findIndex(
-              (r: any) => r.document_id === docId
-            );
-
-            const newResult = {
-              document_id: docId,
-              eob_data: eobResult.data.eob_data,
-              case_data: eobResult.data.case_data,
+            // Prepare EOB record entity for SQL storage
+            const eobRecordEntity = {
+              user_id: userId,
+              claim_number: eobData.claim_number || docId, // Use docId as fallback
+              member_name: eobData.member_name || "Unknown Member",
+              member_address: valueOrUndefined(eobData.member_address),
+              member_id: valueOrUndefined(eobData.member_id),
+              group_number: valueOrUndefined(eobData.group_number),
+              claim_date: valueOrUndefined(eobData.claim_date),
+              provider_name: eobData.provider_name || "Unknown Provider",
+              provider_npi: valueOrUndefined(eobData.provider_npi),
+              total_billed: eobData.total_billed || 0,
+              total_benefits_approved: eobData.total_benefits_approved || 0,
+              amount_you_owe: eobData.amount_you_owe || 0,
+              services: eobData.services ? JSON.stringify(eobData.services) : undefined,
+              coverage_breakdown: eobData.coverage_breakdown ? JSON.stringify(eobData.coverage_breakdown) : undefined,
+              insurance_provider: valueOrUndefined(eobData.insurance_provider),
+              plan_name: valueOrUndefined(eobData.plan_name),
+              policy_number: valueOrUndefined(eobData.policy_number),
+              alerts: eobData.alerts && eobData.alerts.length > 0 ? JSON.stringify(eobData.alerts) : undefined,
+              discrepancies: eobData.discrepancies && eobData.discrepancies.length > 0 ? JSON.stringify(eobData.discrepancies) : undefined,
+              source_document_id: docId,
             };
 
-            if (existingIndex >= 0) {
-              // Update existing entry
-              casesData.results[existingIndex] = newResult;
-            } else {
-              // Add new entry
-              casesData.results.push(newResult);
-              casesData.total_documents = casesData.results.length;
-            }
+            // Store in SQL database
+            await upsertEOBRecord(eobRecordEntity);
+            console.log("EOB record stored successfully in SQL database");
 
-            // Write updated cases data
-            await writeFile(casesJsonPath, JSON.stringify(casesData, null, 2), "utf-8");
-          } catch (saveError) {
-            console.error("Error saving EOB data to cases file:", saveError);
-            // Continue even if save fails - data is still extracted
+            // Add EOB extraction results to the response
+            return NextResponse.json({
+              ...uploadResponse,
+              eobExtraction: {
+                success: true,
+                eobData: eobData,
+                caseData: eobResult.data.case_data,
+                sqlStored: true,
+              },
+            });
+          } catch (sqlError) {
+            console.error("Error storing EOB record in SQL database:", sqlError);
+            // Still return success with EOB data, but note SQL storage failed
+            return NextResponse.json({
+              ...uploadResponse,
+              eobExtraction: {
+                success: true,
+                eobData: eobResult.data.eob_data,
+                caseData: eobResult.data.case_data,
+                sqlStored: false,
+                sqlError: sqlError instanceof Error ? sqlError.message : "Unknown error",
+              },
+              warning: "EOB extracted successfully, but failed to store in SQL database. Data is available in Pinecone.",
+            });
           }
-
-          // Add EOB extraction results to the response
-          return NextResponse.json({
-            ...uploadResponse,
-            eobExtraction: {
-              success: true,
-              eobData: eobResult.data.eob_data,
-              caseData: eobResult.data.case_data,
-              sqlReady: eobResult.data.sql_ready,
-            },
-          });
         } else {
           // Upload succeeded but EOB extraction failed - still return success with warning
           console.warn("EOB extraction failed:", eobResult.error);

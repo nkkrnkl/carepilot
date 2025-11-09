@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useUser } from '@auth0/nextjs-auth0/client';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +37,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { getCases, getEOBData } from "@/lib/services/cases-service";
 import { CaseData, EOBExtractionResult } from "@/lib/types/cases";
+import { Toaster, toast } from "sonner";
 
 // Helper function to generate audit trail from EOB data
 const generateAuditTrail = (eobData: EOBExtractionResult | null): Array<{
@@ -175,7 +177,8 @@ export default function CasesPage() {
   const [loading, setLoading] = useState(true);
   const [loadingCase, setLoadingCase] = useState(false);
 
-  const userId = "user-123"; // TODO: Get from authentication context
+  const { user } = useUser();
+  const userId = user?.email || "user-123"; // Use authenticated user email
 
   // Fetch cases on component mount
   useEffect(() => {
@@ -206,7 +209,11 @@ export default function CasesPage() {
 
       setLoadingCase(true);
       try {
-        const eobData = await getEOBData(selectedCase, userId);
+        // Extract claim number from case ID (format: "eob-{claim_number}")
+        const claimNumber = selectedCase.replace("eob-", "");
+        
+        // Fetch EOB data from SQL Server
+        const eobData = await getEOBData(claimNumber, userId);
         if (eobData) {
           setSelectedEOBData(eobData);
           setSelectedCaseData(eobData.case_data);
@@ -251,6 +258,8 @@ export default function CasesPage() {
   const [appealEmail, setAppealEmail] = useState<any>(null);
   const [generatingAppeal, setGeneratingAppeal] = useState(false);
   const [appealError, setAppealError] = useState<string | null>(null);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
   const [editingStatus, setEditingStatus] = useState(false);
   const [newStatus, setNewStatus] = useState<string>("");
   const [updatingStatus, setUpdatingStatus] = useState(false);
@@ -261,39 +270,56 @@ export default function CasesPage() {
     setShowAppealModal(true);
 
     try {
-      // If EOB data is not loaded yet, try to fetch it first
+      // Extract claim number from case ID (format: "eob-{claim_number}")
+      const claimNumber = caseId.replace("eob-", "");
+      
+      console.log("Generating appeal for case:", caseId, "claim number:", claimNumber);
+      
+      // Try to get EOB data first (for UI display), but API will fetch from SQL if needed
       let eobDataToUse = selectedEOBData;
       
       if (!eobDataToUse) {
-        console.log("EOB data not loaded, fetching...");
-        eobDataToUse = await getEOBData(caseId, userId);
+        console.log("EOB data not loaded in UI, fetching...");
+        eobDataToUse = await getEOBData(claimNumber, userId);
         if (eobDataToUse) {
           setSelectedEOBData(eobDataToUse);
         }
       }
-      
-      if (!eobDataToUse || !eobDataToUse.eob_data) {
-        throw new Error("EOB data not available for this case. Please ensure the EOB document has been processed and uploaded.");
-      }
 
+      // Call appeal API with claim number and userId - API will fetch from SQL Server
+      // This ensures we always have the latest data from the database
       const response = await fetch("/api/appeals/generate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          eob_data: eobDataToUse.eob_data,
-          discrepancy_types: eobDataToUse.eob_data.discrepancies || [],
           case_id: caseId,
+          userId: userId,
+          claimNumber: claimNumber,
+          // Optionally include eob_data if we have it (for faster processing)
+          // But API will fetch from SQL if not provided
+          eob_data: eobDataToUse?.eob_data || null,
+          // Don't pass discrepancy_types - let the appeal agent categorize them from eob_data.discrepancies
+          discrepancy_types: null,
+          additional_context: null,
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to generate appeal email");
+        const errorMessage = errorData.error || `Failed to generate appeal email (${response.status})`;
+        console.error("Appeal generation failed:", errorMessage);
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
+      
+      if (!data.success || !data.appeal_email) {
+        throw new Error("Invalid response from appeal generation API");
+      }
+
+      console.log("Appeal email generated successfully");
       setAppealEmail(data.appeal_email);
     } catch (error) {
       console.error("Error generating appeal:", error);
@@ -317,6 +343,7 @@ export default function CasesPage() {
 
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+        <Toaster />
         {/* Navigation */}
         <nav className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -619,12 +646,43 @@ export default function CasesPage() {
                   {appealEmail && !generatingAppeal && (
                     <>
                       <div>
-                        <label className="text-sm font-medium text-gray-700">To:</label>
+                        <label className="text-sm font-medium text-gray-700">To: <span className="text-red-500">*</span></label>
                         <Input
                           value={appealEmail.recipient || ""}
-                          readOnly
                           className="mt-1"
+                          placeholder="Enter recipient email address (e.g., appeals@insurance.com)"
+                          onChange={(e) => {
+                            if (appealEmail) {
+                              setAppealEmail({
+                                ...appealEmail,
+                                recipient: e.target.value,
+                              });
+                            }
+                          }}
+                          onBlur={(e) => {
+                            // Validate email format on blur
+                            const email = e.target.value.trim();
+                            if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                              // Email format is invalid, but we'll let the user know when they try to send
+                            }
+                          }}
+                          title="Enter the email address of the insurance provider's appeals department"
                         />
+                        {appealEmail.recipient && !appealEmail.recipient.includes("@") && (
+                          <p className="text-xs text-red-500 mt-1">
+                            ⚠ Please enter a valid email address (e.g., appeals@insurance.com)
+                          </p>
+                        )}
+                        {appealEmail.recipient && appealEmail.recipient.includes("@") && (
+                          <p className="text-xs text-green-600 mt-1">
+                            ✓ Valid email address
+                          </p>
+                        )}
+                        {!appealEmail.recipient && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Enter the insurance provider's appeals department email address
+                          </p>
+                        )}
                       </div>
                       <div>
                         <label className="text-sm font-medium text-gray-700">Subject:</label>
@@ -655,11 +713,24 @@ export default function CasesPage() {
                       </div>
                       <div className="flex gap-3 pt-4 border-t">
                         <Button
-                          onClick={() => {
-                            // Copy to clipboard
-                            const emailText = `To: ${appealEmail.recipient}\nSubject: ${appealEmail.subject}\n\n${appealEmail.body}`;
-                            navigator.clipboard.writeText(emailText);
-                            alert("Email copied to clipboard!");
+                          onClick={async () => {
+                            try {
+                              // Copy to clipboard
+                              const emailText = `To: ${appealEmail.recipient}\nSubject: ${appealEmail.subject}\n\n${appealEmail.body}`;
+                              await navigator.clipboard.writeText(emailText);
+                              
+                              // Show success message
+                              const message = document.createElement("div");
+                              message.textContent = "Email copied to clipboard!";
+                              message.className = "fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-md shadow-lg z-50";
+                              document.body.appendChild(message);
+                              setTimeout(() => {
+                                document.body.removeChild(message);
+                              }, 2000);
+                            } catch (error) {
+                              console.error("Failed to copy to clipboard:", error);
+                              alert("Failed to copy email. Please select and copy manually.");
+                            }
                           }}
                           variant="outline"
                         >
@@ -667,22 +738,92 @@ export default function CasesPage() {
                           Copy Email
                         </Button>
                         <Button
-                          onClick={() => {
-                            // Open email client
-                            const subject = encodeURIComponent(appealEmail.subject || "");
-                            const body = encodeURIComponent(appealEmail.body || "");
-                            window.location.href = `mailto:${appealEmail.recipient}?subject=${subject}&body=${body}`;
+                          onClick={async () => {
+                            try {
+                              setSendingEmail(true);
+                              setEmailSent(false);
+                              
+                              // Validate recipient email
+                              const recipientEmail = appealEmail.recipient?.trim() || "";
+                              
+                              // Check if it's a valid email address
+                              const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                              const isValidEmail = emailRegex.test(recipientEmail);
+                              
+                              if (!isValidEmail) {
+                                setSendingEmail(false);
+                                toast.error("Please enter a valid email address in the 'To' field");
+                                return;
+                              }
+                              
+                              // Encode email components
+                              const subject = encodeURIComponent(appealEmail.subject || "");
+                              const body = encodeURIComponent(appealEmail.body || "");
+                              
+                              // Construct mailto link with all components
+                              const mailtoLink = `mailto:${recipientEmail}?subject=${subject}&body=${body}`;
+                              
+                              // Try to open email client
+                              // Create a temporary anchor element to trigger mailto
+                              const link = document.createElement("a");
+                              link.href = mailtoLink;
+                              link.style.display = "none";
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                              
+                              // Mark as sent after a short delay
+                              setTimeout(() => {
+                                setEmailSent(true);
+                                setSendingEmail(false);
+                                toast.success("Email client opened! Please review and send the email.");
+                                
+                                // Reset sent state after a delay
+                                setTimeout(() => {
+                                  setEmailSent(false);
+                                }, 3000);
+                              }, 500);
+                              
+                            } catch (error) {
+                              console.error("Error opening email client:", error);
+                              setSendingEmail(false);
+                              toast.error("Failed to open email client. Please ensure you have an email client configured, or use the 'Copy Email' button.");
+                            }
                           }}
                           className="bg-purple-600 hover:bg-purple-700"
+                          disabled={sendingEmail || !appealEmail?.recipient?.includes("@")}
+                          title={
+                            sendingEmail
+                              ? "Opening email client..."
+                              : !appealEmail?.recipient?.includes("@")
+                              ? "Please enter a valid email address in the 'To' field"
+                              : `Send email to ${appealEmail.recipient}`
+                          }
                         >
-                          <Send className="h-4 w-4 mr-2" />
-                          Open in Email Client
+                          {sendingEmail ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Opening...
+                            </>
+                          ) : emailSent ? (
+                            <>
+                              <CheckCircle2 className="h-4 w-4 mr-2" />
+                              Email Opened
+                            </>
+                          ) : (
+                            <>
+                              <Send className="h-4 w-4 mr-2" />
+                              Send Email
+                            </>
+                          )}
                         </Button>
                         <Button
                           onClick={() => {
                             setShowAppealModal(false);
                             setAppealEmail(null);
                             setAppealError(null);
+                            setEmailSent(false);
+                            setSendingEmail(false);
                           }}
                           variant="outline"
                         >
@@ -965,6 +1106,7 @@ export default function CasesPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+      <Toaster />
       {/* Navigation */}
       <nav className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

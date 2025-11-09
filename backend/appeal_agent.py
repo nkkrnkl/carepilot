@@ -67,13 +67,21 @@ class AppealEmailAgent:
         alerts = eob_data.get("alerts", [])
         services = eob_data.get("services", [])
         
+        print(f"  Found {len(discrepancies)} discrepancies: {discrepancies}")
+        print(f"  Discrepancy types provided: {discrepancy_types}")
+        print(f"  Services count: {len(services)}")
+        
         # Use "Weill Cornell Medicine" as default provider name
         if not provider_name or provider_name == "Unknown":
             provider_name = "Weill Cornell Medicine"
         
         # Determine discrepancy types if not provided
         if not discrepancy_types:
+            print("  No discrepancy types provided, identifying from discrepancies...")
             discrepancy_types = self._identify_discrepancy_types(discrepancies, eob_data)
+            print(f"  Identified discrepancy types: {discrepancy_types}")
+        else:
+            print(f"  Using provided discrepancy types: {discrepancy_types}")
         
         # Build context for the LLM
         context = self._build_appeal_context(
