@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
   Calendar,
-  ArrowLeft,
   CheckCircle2,
   AlertCircle,
   Clock,
@@ -16,7 +15,7 @@ import {
   Loader2
 } from "lucide-react";
 import { useUser } from '@auth0/nextjs-auth0/client';
-import { useDashboardUrl } from '@/lib/navigation';
+import { PatientNavbar } from "@/components/layout/patient-navbar";
 import { ProviderCard, Provider, Slot } from "@/components/scheduling/provider-card";
 import { SearchFilters, FilterState } from "@/components/scheduling/search-filters";
 import { BookingDrawer } from "@/components/scheduling/booking-drawer";
@@ -103,7 +102,6 @@ const mockProviders: Provider[] = [
 
 export default function SchedulingPage() {
   const { user, isLoading: authLoading } = useUser();
-  const dashboardUrl = useDashboardUrl();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -480,28 +478,7 @@ export default function SchedulingPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navigation */}
-      <nav className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-4">
-              <Button asChild variant="ghost" size="sm">
-                <Link href={dashboardUrl} className="flex items-center gap-2">
-                  <ArrowLeft className="h-4 w-4" />
-                  Back
-                </Link>
-              </Button>
-              <div className="flex items-center gap-2">
-                <Calendar className="h-6 w-6 text-green-600" />
-                <span className="text-xl font-bold text-gray-900">Scheduling</span>
-              </div>
-            </div>
-            <Button asChild variant="outline">
-              <Link href={dashboardUrl}>Dashboard</Link>
-            </Button>
-          </div>
-        </div>
-      </nav>
+      <PatientNavbar />
 
       {/* Success Banner */}
       {isConfirmed && (

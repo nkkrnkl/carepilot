@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Navbar } from "@/components/layout/navbar";
+import { PatientNavbar } from "@/components/layout/patient-navbar";
 import { Footer } from "@/components/layout/footer";
 import { FeatureCard } from "@/components/feature-card";
 import { HeroSection } from "@/components/sections/hero-section";
@@ -11,9 +12,44 @@ import { CTASection } from "@/components/sections/cta-section";
 import { FEATURES, ROUTES } from "@/lib/constants";
 import { Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useUser } from '@auth0/nextjs-auth0/client';
+import { useRouter } from 'next/navigation';
 
 export default function LandingPage() {
+  const { user, isLoading } = useUser();
+  const router = useRouter();
   const [scrollY, setScrollY] = useState(0);
+  const [shouldRedirect, setShouldRedirect] = useState(false);
+
+  // Redirect authenticated users to dashboard on initial direct visit
+  // But allow intentional navigation to landing page via "Home" link
+  useEffect(() => {
+    if (!isLoading && user) {
+      // Check if user intentionally navigated here (via Home link)
+      const wantLandingPage = sessionStorage.getItem('wantLandingPage');
+      
+      if (wantLandingPage) {
+        // User clicked "Home" link - allow them to see landing page
+        // Clear the flag after a short delay to prevent re-setting on re-render
+        setTimeout(() => {
+          sessionStorage.removeItem('wantLandingPage');
+        }, 100);
+      } else {
+        // Direct visit or page refresh - redirect to dashboard
+        // Use a small delay to check if this is a navigation event
+        const timeoutId = setTimeout(() => {
+          // Double-check flag wasn't set during the delay (user might have clicked Home quickly)
+          const stillWantLanding = sessionStorage.getItem('wantLandingPage');
+          if (!stillWantLanding) {
+            setShouldRedirect(true);
+            router.push(ROUTES.PATIENT);
+          }
+        }, 200);
+        
+        return () => clearTimeout(timeoutId);
+      }
+    }
+  }, [user, isLoading, router]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -24,9 +60,24 @@ export default function LandingPage() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Show loading state while checking auth or redirecting
+  if (isLoading || (user && shouldRedirect)) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Use PatientNavbar if user is authenticated, otherwise use regular Navbar
+  const NavbarComponent = user ? PatientNavbar : Navbar;
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-      <Navbar />
+      <NavbarComponent />
 
       <HeroSection
         badge={{
@@ -35,7 +86,7 @@ export default function LandingPage() {
         }}
         title={{
           primary: "CarePilot",
-          secondary: "Your Healthcare Navigation System",
+          secondary: "Your copilot for health",
           secondaryColor: "text-blue-600",
         }}
         description="CarePilot is an AI agent that handles key healthcare tasks to streamline your experience. From analyzing lab results to managing bills, EOBs, and claims—we automate the complex so you can focus on what matters."

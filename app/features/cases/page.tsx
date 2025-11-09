@@ -38,6 +38,7 @@ import { Input } from "@/components/ui/input";
 import { getCases, getEOBData } from "@/lib/services/cases-service";
 import { CaseData, EOBExtractionResult } from "@/lib/types/cases";
 import { Toaster, toast } from "sonner";
+import { PatientNavbar } from "@/components/layout/patient-navbar";
 
 // Helper function to generate audit trail from EOB data
 const generateAuditTrail = (eobData: EOBExtractionResult | null): Array<{
@@ -1107,28 +1108,7 @@ export default function CasesPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       <Toaster />
-      {/* Navigation */}
-      <nav className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-4">
-              <Button asChild variant="ghost" size="sm">
-                <Link href="/" className="flex items-center gap-2">
-                  <ArrowLeft className="h-4 w-4" />
-                  Back
-                </Link>
-              </Button>
-              <div className="flex items-center gap-2">
-                <FileText className="h-6 w-6 text-purple-600" />
-                <span className="text-xl font-bold text-gray-900">Cases</span>
-              </div>
-            </div>
-            <Button asChild variant="outline">
-              <Link href="/">Home</Link>
-            </Button>
-          </div>
-        </div>
-      </nav>
+      <PatientNavbar />
 
       {/* Hero Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">

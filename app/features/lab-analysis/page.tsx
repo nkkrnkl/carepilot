@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DocumentUploadSimple } from "@/components/documents/document-upload-simple";
@@ -9,9 +8,8 @@ import { PreviousReports } from "@/components/labs/PreviousReports";
 import { CurrentDataCards } from "@/components/labs/CurrentDataCards";
 import { PastVisitsCharts } from "@/components/labs/PastVisitsCharts";
 import { Toaster, toast } from "sonner";
-import { ArrowLeft, FlaskConical } from "lucide-react";
 import { useUser } from '@auth0/nextjs-auth0/client';
-import { useDashboardUrl } from '@/lib/navigation';
+import { PatientNavbar } from "@/components/layout/patient-navbar";
 
 interface LabReport {
   id: string;
@@ -25,7 +23,6 @@ interface LabReport {
 
 export default function LabsPage() {
   const { user } = useUser();
-  const dashboardUrl = useDashboardUrl();
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [selectedReport, setSelectedReport] = useState<LabReport | null>(null);
   const [loading, setLoading] = useState(false);
@@ -89,29 +86,7 @@ export default function LabsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       <Toaster />
-      
-      {/* Navigation */}
-      <nav className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-4">
-              <Button asChild variant="ghost" size="sm">
-                <Link href={dashboardUrl} className="flex items-center gap-2">
-                  <ArrowLeft className="h-4 w-4" />
-                  Back
-                </Link>
-              </Button>
-              <div className="flex items-center gap-2">
-                <FlaskConical className="h-6 w-6 text-blue-600" />
-                <span className="text-xl font-bold text-gray-900">Lab Analysis</span>
-              </div>
-            </div>
-            <Button asChild variant="outline">
-              <Link href={dashboardUrl}>Dashboard</Link>
-            </Button>
-          </div>
-        </div>
-      </nav>
+      <PatientNavbar />
 
       {/* Main Content */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
