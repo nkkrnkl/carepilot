@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -664,7 +665,52 @@ class DashboardBuilder:
 # --------------------------------------------------------------------------- #
 
 
-def main() -> None:
+def _bridge_entry(input_path: Path, output_path: Path) -> int:
+    """
+    Entry point compatible with lib/python-bridge.ts.
+    Expects input JSON with optional "user_id" or "userId" key and writes the payload to output JSON.
+    """
+    try:
+        options: Dict[str, Any] = {}
+        if input_path.exists():
+            with input_path.open("r", encoding="utf-8") as handle:
+                options = json.load(handle)
+
+        user_id = options.get("user_id") or options.get("userId") or "user-123"
+        builder = DashboardBuilder(user_id=str(user_id))
+        payload = builder.build_payload()
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with output_path.open("w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2)
+
+        # Optional stdout for easier debugging
+        print(json.dumps({"success": True, "userId": user_id}))
+        return 0
+    except Exception as exc:  # pylint: disable=broad-except
+        error_payload = {
+            "success": False,
+            "error": str(exc),
+            "error_type": exc.__class__.__name__,
+        }
+        try:
+            with output_path.open("w", encoding="utf-8") as handle:
+                json.dump(error_payload, handle, indent=2)
+        except Exception:  # pylint: disable=broad-except
+            pass
+        print(json.dumps(error_payload))
+        return 1
+
+
+def main(argv: Optional[List[str]] = None) -> None:
+    argv = list(sys.argv[1:] if argv is None else argv)
+
+    # Python bridge mode: script.py input.json output.json
+    if len(argv) == 2 and not argv[0].startswith("--"):
+        status = _bridge_entry(Path(argv[0]), Path(argv[1]))
+        sys.exit(status)
+
+    # CLI mode
     parser = argparse.ArgumentParser(description="Build dashboard payload for a user.")
     parser.add_argument("--user-id", required=False, default="user-123", help="User identifier / email")
     parser.add_argument(
@@ -673,7 +719,7 @@ def main() -> None:
         type=Path,
         help="Optional path to write the JSON payload. Prints to stdout when omitted.",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     builder = DashboardBuilder(user_id=args.user_id)
     payload = builder.build_payload()
