@@ -112,3 +112,4 @@ next-env.d.ts
 .vercel
 
 /lib/generated/prisma
+backend/venv

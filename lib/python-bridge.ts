@@ -8,6 +8,7 @@ import { join } from "path";
 import { writeFileSync, readFileSync, unlinkSync, existsSync } from "fs";
 import { tmpdir } from "os";
 import { randomUUID } from "crypto";
+import { accessSync, constants } from "fs";
 
 export interface PythonExecutionOptions {
   [key: string]: any;
@@ -44,9 +45,35 @@ export async function executePython(
       // Write input data to file
       writeFileSync(inputFile, JSON.stringify(options, null, 2), 'utf-8');
 
+      // Check if we have a virtual environment in the backend directory
+      const backendVenvPath = join(process.cwd(), "backend", "venv", "bin", "python");
+      const pythonExecutable = (() => {
+        try {
+          if (existsSync(backendVenvPath)) {
+            // Verify it's executable
+            accessSync(backendVenvPath, constants.F_OK | constants.X_OK);
+            return backendVenvPath;
+          }
+        } catch (e) {
+          // Fallback to system python3
+          console.log("⚠️ Virtual environment not found, using system python3");
+        }
+        return "python3";
+      })();
+      
+      console.log(`🐍 Using Python executable: ${pythonExecutable}`);
+
       // Execute Python script with file arguments
-      const pythonProcess = spawn("python3", [scriptPath, inputFile, outputFile], {
+      const pythonProcess = spawn(pythonExecutable, [scriptPath, inputFile, outputFile], {
         cwd: process.cwd(),
+        env: {
+          ...process.env,
+          // Ensure virtual environment is used if it exists
+          ...(pythonExecutable.includes("venv") ? {
+            VIRTUAL_ENV: join(process.cwd(), "backend", "venv"),
+            PATH: `${join(process.cwd(), "backend", "venv", "bin")}:${process.env.PATH}`,
+          } : {}),
+        },
       });
 
       let stdout = "";
