@@ -1,17 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useUser } from '@auth0/nextjs-auth0/client';
-import { useDashboardUrl } from '@/lib/navigation';
 import { Toaster, toast } from "sonner";
+import { PatientNavbar } from "@/components/layout/patient-navbar";
 import {
-  ArrowLeft,
   User,
   Bell,
   Shield,
@@ -38,7 +36,6 @@ import {
 } from "lucide-react";
 
 export default function SettingsPage() {
-  const dashboardUrl = useDashboardUrl();
   const { user: auth0User, isLoading: userLoading } = useUser();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -305,28 +302,7 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Toaster />
-      {/* Navigation */}
-      <nav className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-4">
-              <Button asChild variant="ghost" size="sm">
-                <Link href={dashboardUrl} className="flex items-center gap-2">
-                  <ArrowLeft className="h-4 w-4" />
-                  Back
-                </Link>
-              </Button>
-              <div className="flex items-center gap-2">
-                <SettingsIcon className="h-6 w-6 text-blue-600" />
-                <span className="text-xl font-bold text-gray-900">Settings</span>
-              </div>
-            </div>
-            <Button asChild variant="outline">
-              <Link href={dashboardUrl}>Dashboard</Link>
-            </Button>
-          </div>
-        </div>
-      </nav>
+      <PatientNavbar />
 
       {/* Success Banner */}
       {isSaved && (

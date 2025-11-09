@@ -66,7 +66,14 @@ export function PatientNavbar() {
             <Button variant="ghost" size="icon" aria-label="Notifications" title="Notifications">
               <Bell className="h-5 w-5" />
             </Button>
-            <Button asChild variant="ghost" size="icon" aria-label="Settings" title="Settings">
+            <Button 
+              asChild 
+              variant="ghost" 
+              size="icon" 
+              aria-label="Settings" 
+              title="Settings"
+              className={isActive("/settings") ? "bg-blue-50 text-blue-600" : ""}
+            >
               <Link href="/settings">
                 <Settings className="h-5 w-5" />
               </Link>
