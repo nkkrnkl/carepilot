@@ -38,19 +38,11 @@ export default function LandingPage() {
         setCheckingRole(true);
         try {
           // Check if user has a role set in database
-          const response = await fetch(`/api/users/role`);
-          
-          // Handle non-OK responses
-          if (!response.ok) {
-            // If unauthorized, user is not logged in or session expired
-            if (response.status === 401) {
-              setCheckingRole(false);
-              hasCheckedRole.current = false; // Allow retry if session becomes valid
-              return; // Stay on landing page
-            }
-            throw new Error(`API error: ${response.status}`);
-          }
-          
+          // Try the role API endpoint first
+          try {
+            const response = await fetch(`/api/users/role?email=${encodeURIComponent(user.email)}`);
+            
+            if (response.ok) {
           const data = await response.json();
           
           if (data.success && data.role) {
@@ -58,23 +50,28 @@ export default function LandingPage() {
             window.location.href = data.role === "doctor" ? "/doctorportal" : "/patient";
             return;
           }
-          
-          // Check if user exists in database with role
-          const userResponse = await fetch(`/api/users?emailAddress=${encodeURIComponent(user.email)}`);
-          
-          if (!userResponse.ok) {
-            // If error, just show landing page
-            setCheckingRole(false);
-            hasCheckedRole.current = false; // Allow retry
-            return;
+            }
+          } catch (roleError) {
+            console.warn("Error fetching role from API:", roleError);
+            // Continue to fallback
           }
           
+          // Fallback: Check if user exists in database with role
+          try {
+          const userResponse = await fetch(`/api/users?emailAddress=${encodeURIComponent(user.email)}`);
+          
+            if (userResponse.ok) {
           const userData = await userResponse.json();
           
           if (userData.success && userData.user?.userRole) {
             // User has a role, redirect to appropriate dashboard immediately
             window.location.href = userData.user.userRole === "doctor" ? "/doctorportal" : "/patient";
             return;
+              }
+            }
+          } catch (userError) {
+            console.warn("Error fetching user from API:", userError);
+            // Continue to role selection
           }
           
           // User is logged in but has no role - redirect to sign-in page to select role

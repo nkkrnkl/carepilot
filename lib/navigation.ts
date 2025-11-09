@@ -24,7 +24,7 @@ export function useDashboardUrl(): string {
       setCheckingRole(true);
       try {
         // First, try to get role from the role API
-        const response = await fetch('/api/users/role');
+        const response = await fetch(`/api/users/role?email=${encodeURIComponent(user.email)}`);
         const data = await response.json();
         
         if (data.success && data.role) {
@@ -35,12 +35,18 @@ export function useDashboardUrl(): string {
         
         // Fallback: check user data directly
         const userResponse = await fetch(`/api/users?emailAddress=${encodeURIComponent(user.email)}`);
-        const userData = await userResponse.json();
         
-        if (userData.success && userData.user?.userRole) {
-          setDashboardUrl(userData.user.userRole === 'doctor' ? '/doctorportal' : '/patient');
+        if (userResponse.ok) {
+          const userData = await userResponse.json();
+          
+          if (userData.success && userData.user?.userRole) {
+            setDashboardUrl(userData.user.userRole === 'doctor' ? '/doctorportal' : '/patient');
+          } else {
+            // No role set, default to patient dashboard
+            setDashboardUrl('/patient');
+          }
         } else {
-          // No role set, default to patient dashboard
+          // User doesn't exist (404) or other error - default to patient dashboard
           setDashboardUrl('/patient');
         }
       } catch (error) {

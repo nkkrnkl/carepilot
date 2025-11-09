@@ -17,7 +17,7 @@ export const maxDuration = 60;
  * and include docType="lab_report" in the form data.
  */
 export async function POST(request: NextRequest) {
-  return NextResponse.json(
+      return NextResponse.json(
     {
       error: "This endpoint is deprecated",
       message: "Please use /api/documents/upload instead. Include docType='lab_report' in your form data.",

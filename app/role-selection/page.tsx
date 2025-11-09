@@ -40,7 +40,7 @@ export default function RoleSelectionPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ role }),
+        body: JSON.stringify({ email: user.email, role }),
       });
 
       const data = await response.json();

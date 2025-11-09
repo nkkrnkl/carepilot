@@ -25,7 +25,7 @@ export default function SignInPage() {
           const storedRole = sessionStorage.getItem("signupRole");
           
           // Check if user has a role set in database
-          const response = await fetch(`/api/users/role`);
+          const response = await fetch(`/api/users/role?email=${encodeURIComponent(user.email)}`);
           const data = await response.json();
           
           if (data.success && data.role) {
@@ -37,14 +37,18 @@ export default function SignInPage() {
           
           // Check if user exists in database with role
           const userResponse = await fetch(`/api/users?emailAddress=${encodeURIComponent(user.email)}`);
-          const userData = await userResponse.json();
           
-          if (userData.success && userData.user?.userRole) {
-            // User has a role in database, automatically redirect
-            sessionStorage.removeItem("signupRole"); // Clean up
-            router.push(userData.user.userRole === "doctor" ? "/doctorportal" : "/patient");
-            return;
+          if (userResponse.ok) {
+            const userData = await userResponse.json();
+            
+            if (userData.success && userData.user?.userRole) {
+              // User has a role in database, automatically redirect
+              sessionStorage.removeItem("signupRole"); // Clean up
+              router.push(userData.user.userRole === "doctor" ? "/doctorportal" : "/patient");
+              return;
+            }
           }
+          // If 404 or no role, continue to role selection
           
           // No role in database - check if role was stored during signup
           if (storedRole && (storedRole === "patient" || storedRole === "doctor")) {
@@ -78,7 +82,7 @@ export default function SignInPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ role }),
+        body: JSON.stringify({ email: user.email, role }),
       });
 
       const data = await response.json();

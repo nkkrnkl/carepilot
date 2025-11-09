@@ -10,7 +10,7 @@
 async function clearLabs() {
   console.log("ℹ️  Lab clearing script: Prisma has been removed.");
   console.log("   Lab reports are now managed through SQL Server and the document upload system.");
-  console.log("   Continuing with dev server startup...");
+    console.log("   Continuing with dev server startup...");
 }
 
 clearLabs();
