@@ -115,11 +115,27 @@ export default function SchedulingPage() {
   // Function to mark slots as unavailable based on existing appointments
   const markBookedSlots = (providersData: Provider[], appointments: any[]) => {
     return providersData.map(provider => {
+      // Ensure slots is an array (handle cases where it might be a string or undefined)
+      let slots: Slot[] = [];
+      if (Array.isArray(provider.slots)) {
+        slots = provider.slots;
+      } else if (typeof provider.slots === 'string') {
+        try {
+          slots = JSON.parse(provider.slots);
+        } catch (e) {
+          console.warn(`Failed to parse slots for provider ${provider.id}:`, e);
+          slots = [];
+        }
+      } else if (provider.slots) {
+        // Try to convert to array if it's an object
+        slots = Object.values(provider.slots) as Slot[];
+      }
+      
       // Find appointments for this provider
       const providerAppointments = appointments.filter(apt => apt.doctorId === provider.id && apt.status === 'scheduled');
       
       // Mark slots as unavailable if they match an existing appointment
-      const updatedSlots = provider.slots.map(slot => {
+      const updatedSlots = slots.map(slot => {
         // Check if this slot matches any appointment
         const isBooked = providerAppointments.some(apt => {
           // Parse appointment date/time
@@ -188,18 +204,87 @@ export default function SchedulingPage() {
         setError(null);
         
         // Fetch providers
+        console.log("🔍 Fetching doctors from API...");
         const providersResponse = await fetch('/api/doctors');
+        
+        if (!providersResponse.ok) {
+          throw new Error(`API returned ${providersResponse.status}: ${providersResponse.statusText}`);
+        }
+        
         const providersResult = await providersResponse.json();
+        console.log("📊 API Response:", {
+          success: providersResult.success,
+          count: providersResult.count,
+          source: providersResult.source,
+          hasData: !!providersResult.data,
+          dataLength: providersResult.data?.length || 0
+        });
         
         let providersData: Provider[] = [];
         if (providersResult.success && providersResult.data && providersResult.data.length > 0) {
-          console.log(`✅ Loaded ${providersResult.data.length} providers from ${providersResult.source || 'API'}`);
-          providersData = providersResult.data;
+          console.log(`✅ Loaded ${providersResult.data.length} providers from ${providersResult.source || 'API'} (database: ${providersResult.database || 'unknown'})`);
+          
+          // Ensure all providers have properly formatted data
+          providersData = providersResult.data.map((provider: any) => {
+            // Ensure slots is always an array
+            let slots: Slot[] = [];
+            if (Array.isArray(provider.slots)) {
+              slots = provider.slots;
+            } else if (typeof provider.slots === 'string') {
+              try {
+                slots = JSON.parse(provider.slots);
+              } catch (e) {
+                console.warn(`Failed to parse slots for provider ${provider.id}:`, e);
+                slots = [];
+              }
+            }
+            
+            // Ensure languages is always an array
+            let languages: string[] = [];
+            if (Array.isArray(provider.languages)) {
+              languages = provider.languages;
+            } else if (typeof provider.languages === 'string') {
+              try {
+                languages = JSON.parse(provider.languages);
+              } catch (e) {
+                console.warn(`Failed to parse languages for provider ${provider.id}:`, e);
+                languages = [];
+              }
+            }
+            
+            // Ensure reasons is always an array
+            let reasons: string[] = [];
+            if (Array.isArray(provider.reasons)) {
+              reasons = provider.reasons;
+            } else if (typeof provider.reasons === 'string') {
+              try {
+                reasons = JSON.parse(provider.reasons);
+              } catch (e) {
+                console.warn(`Failed to parse reasons for provider ${provider.id}:`, e);
+                reasons = [];
+              }
+            }
+            
+            return {
+              ...provider,
+              slots,
+              languages,
+              reasons,
+              // Ensure required fields have defaults
+              distance: provider.distance || "Unknown",
+              travelTime: provider.travelTime || "Unknown",
+              estimatedCost: provider.estimatedCost || 0,
+            };
+          });
+          
+          setError(null); // Clear any previous errors
         } else if (providersResult.data && providersResult.data.length === 0) {
-          console.warn("API returned empty array, using mock providers");
+          console.warn("⚠️ API returned empty array, using mock providers");
+          setError("No doctors found in database. Using mock data.");
           providersData = mockProviders;
         } else {
-          console.warn("API returned no data, using mock providers");
+          console.warn("⚠️ API returned no data, using mock providers");
+          setError(`API error: ${providersResult.error || 'Unknown error'}. Using mock data.`);
           providersData = mockProviders;
         }
         
@@ -222,7 +307,15 @@ export default function SchedulingPage() {
         }
       } catch (err) {
         console.error("Error fetching providers:", err);
-        setError("Failed to load providers. Using mock data.");
+        const errorMessage = err instanceof Error ? err.message : "Unknown error";
+        console.error("Full error:", errorMessage);
+        
+        // Check if it's a database connection error
+        if (errorMessage.includes("AZURE_SQL") || errorMessage.includes("Login failed") || errorMessage.includes("connection")) {
+          setError(`Database connection error: ${errorMessage}. Please check your Azure SQL credentials in .env.local`);
+        } else {
+          setError(`Failed to load providers: ${errorMessage}. Using mock data.`);
+        }
         setProviders(mockProviders);
       } finally {
         setLoading(false);
@@ -417,6 +510,20 @@ export default function SchedulingPage() {
             <div className="flex items-center gap-2 text-green-800">
               <CheckCircle2 className="h-5 w-5" />
               <span className="font-medium">Appointment confirmed! Check your email for details.</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Info Banner - Show database connection status */}
+      {providers.length > 0 && providers.length !== mockProviders.length && (
+        <div className="bg-blue-50 border-b border-blue-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+            <div className="flex items-center gap-2 text-blue-800">
+              <CheckCircle2 className="h-4 w-4" />
+              <span className="text-sm font-medium">
+                Loaded {providers.length} doctors from database
+              </span>
             </div>
           </div>
         </div>

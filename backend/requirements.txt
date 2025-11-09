@@ -17,6 +17,7 @@ pytesseract
 openai
 azure-identity
 azure-core
+azure-ai-projects
 numpy
 
 # Vector Database - Pinecone (Direct API)
